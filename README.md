@@ -24,6 +24,8 @@ A real-time fantasy soccer draft app for World Cup 2026, built for a small frien
 Requires: Docker Desktop
 
 ```bash
+cp .env.example .env
+# Fill in your Firebase values (Firebase Console → Project Settings → Your Apps)
 docker compose up
 ```
 
@@ -32,6 +34,11 @@ App: http://localhost:3000 · API: http://localhost:8081 · Emulator UI: http://
 ### Manual (three terminals)
 
 Requires: Go 1.25+, Firebase CLI, Java (for Firestore emulator)
+
+```bash
+cp public/js/config.js.example public/js/config.js
+# Fill in your Firebase values
+```
 
 ```bash
 # Terminal 1 — Firebase emulators (Auth + Firestore)
