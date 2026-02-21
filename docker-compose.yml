@@ -19,9 +19,9 @@ services:
       - "8081:8081"
     environment:
       - PORT=8081
-      - FIREBASE_PROJECT_ID=andy-personal-1bb38
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - FIRESTORE_EMULATOR_HOST=emulators:8080
-      - ADMIN_EMAILS=mandrew307@gmail.com
+      - ADMIN_EMAILS=${ADMIN_EMAILS}
       - GOOGLE_APPLICATION_CREDENTIALS=/keys/fantasy-wc-sa.json
     volumes:
       - .:/app
@@ -35,7 +35,7 @@ services:
   seed:
     image: golang:1.26-alpine
     environment:
-      - FIREBASE_PROJECT_ID=andy-personal-1bb38
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - FIRESTORE_EMULATOR_HOST=emulators:8080
     volumes:
       - .:/app
@@ -45,18 +45,18 @@ services:
       - emulators
     restart: "no"
 
-  # Static frontend (serves public/)
+  # Static frontend (serves public/) — config.js generated at startup from .env
   frontend:
     image: nginx:alpine
     ports:
       - "3000:80"
     environment:
-      - FIREBASE_API_KEY=AIzaSyCatUYtIxlkhR8YVvsSOdLvncbD4yr9JvY
-      - FIREBASE_AUTH_DOMAIN=andy-personal-1bb38.firebaseapp.com
-      - FIREBASE_PROJECT_ID=andy-personal-1bb38
-      - FIREBASE_STORAGE_BUCKET=andy-personal-1bb38.firebasestorage.app
-      - FIREBASE_MESSAGING_SENDER_ID=439489396970
-      - FIREBASE_APP_ID=1:439489396970:web:7e4ff585342fc9b5481793
+      - FIREBASE_API_KEY=${FIREBASE_API_KEY}
+      - FIREBASE_AUTH_DOMAIN=${FIREBASE_AUTH_DOMAIN}
+      - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
+      - FIREBASE_STORAGE_BUCKET=${FIREBASE_STORAGE_BUCKET}
+      - FIREBASE_MESSAGING_SENDER_ID=${FIREBASE_MESSAGING_SENDER_ID}
+      - FIREBASE_APP_ID=${FIREBASE_APP_ID}
     volumes:
       - ./public:/usr/share/nginx/html
       - ./scripts/generate-config.sh:/docker-entrypoint.d/40-generate-config.sh:ro
