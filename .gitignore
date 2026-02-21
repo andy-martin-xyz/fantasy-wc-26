@@ -82,3 +82,6 @@ node_modules/
 # Local keys — never commit credentials
 *.json.key
 keys/
+
+# Firebase config — contains API key, generated from config.js.example
+public/js/config.js
