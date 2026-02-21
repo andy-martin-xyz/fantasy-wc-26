@@ -111,15 +111,15 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 	// 3. Recalculate totalPoints for every drafted player.
 	//    Sum all pointsAwarded across all their playerMatchStats docs.
 	//    This is idempotent regardless of how many times we reprocess.
-	if err := h.recalcAllPlayerPoints(ctx); err != nil {
-		h.Log.Error("process scores: recalc player points", "err", err)
+	if err := h.recalculateAllPlayerPoints(ctx); err != nil {
+		h.Log.Error("process scores: recalculate player points", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error recalculating player points")
 		return
 	}
 
 	// 4. Recalculate each roster's totalPoints.
-	if err := h.recalcAllRosterPoints(ctx); err != nil {
-		h.Log.Error("process scores: recalc roster points", "err", err)
+	if err := h.recalculateAllRosterPoints(ctx); err != nil {
+		h.Log.Error("process scores: recalculate roster points", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error recalculating roster points")
 		return
 	}
@@ -141,16 +141,16 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"matchId": req.MatchID, "processed": len(req.Stats)})
 }
 
-// recalcAllPlayerPoints sums each drafted player's match stats and updates totalPoints.
-func (h *Handler) recalcAllPlayerPoints(ctx context.Context) error {
+// recalculateAllPlayerPoints sums each drafted player's match stats and updates totalPoints.
+func (h *Handler) recalculateAllPlayerPoints(ctx context.Context) error {
 	playerDocs, err := h.DB.FS.Collection("players").Where("drafted", "==", true).Documents(ctx).GetAll()
 	if err != nil {
 		return err
 	}
 
-	for _, pd := range playerDocs {
+	for _, playerDoc := range playerDocs {
 		var player models.Player
-		if err := pd.DataTo(&player); err != nil {
+		if err := playerDoc.DataTo(&player); err != nil {
 			continue
 		}
 
@@ -158,14 +158,14 @@ func (h *Handler) recalcAllPlayerPoints(ctx context.Context) error {
 			Where("playerId", "==", player.ID).
 			Documents(ctx).GetAll()
 		if err != nil {
-			h.Log.Warn("recalc: get player stats", "player", player.ID, "err", err)
+			h.Log.Warn("recalculate: get player stats", "player", player.ID, "err", err)
 			continue
 		}
 
 		total := 0
-		for _, sd := range statDocs {
+		for _, statDoc := range statDocs {
 			var ps models.PlayerMatchStats
-			if err := sd.DataTo(&ps); err == nil {
+			if err := statDoc.DataTo(&ps); err == nil {
 				total += ps.PointsAwarded
 			}
 		}
@@ -173,22 +173,22 @@ func (h *Handler) recalcAllPlayerPoints(ctx context.Context) error {
 		if err := h.DB.UpdateDoc(ctx, "players", player.ID, []firestore.Update{
 			{Path: "totalPoints", Value: total},
 		}); err != nil {
-			h.Log.Warn("recalc: update player totalPoints", "player", player.ID, "err", err)
+			h.Log.Warn("recalculate: update player totalPoints", "player", player.ID, "err", err)
 		}
 	}
 	return nil
 }
 
-// recalcAllRosterPoints sums each roster player's totalPoints.
-func (h *Handler) recalcAllRosterPoints(ctx context.Context) error {
+// recalculateAllRosterPoints sums each roster player's totalPoints.
+func (h *Handler) recalculateAllRosterPoints(ctx context.Context) error {
 	rosterDocs, err := h.DB.FS.Collection("rosters").Documents(ctx).GetAll()
 	if err != nil {
 		return err
 	}
 
-	for _, rd := range rosterDocs {
+	for _, rosterDoc := range rosterDocs {
 		var roster models.Roster
-		if err := rd.DataTo(&roster); err != nil {
+		if err := rosterDoc.DataTo(&roster); err != nil {
 			continue
 		}
 		total := 0
@@ -199,10 +199,10 @@ func (h *Handler) recalcAllRosterPoints(ctx context.Context) error {
 				total += player.TotalPoints
 			}
 		}
-		if err := h.DB.UpdateDoc(ctx, "rosters", rd.Ref.ID, []firestore.Update{
+		if err := h.DB.UpdateDoc(ctx, "rosters", rosterDoc.Ref.ID, []firestore.Update{
 			{Path: "totalPoints", Value: total},
 		}); err != nil {
-			h.Log.Warn("recalc: update roster totalPoints", "uid", rd.Ref.ID, "err", err)
+			h.Log.Warn("recalculate: update roster totalPoints", "uid", rosterDoc.Ref.ID, "err", err)
 		}
 	}
 	return nil
@@ -217,9 +217,9 @@ func (h *Handler) rebuildLeaderboard(ctx context.Context) error {
 	}
 
 	standings := make([]models.LeaderboardEntry, 0, len(rosterDocs))
-	for _, rd := range rosterDocs {
+	for _, rosterDoc := range rosterDocs {
 		var roster models.Roster
-		if err := rd.DataTo(&roster); err != nil {
+		if err := rosterDoc.DataTo(&roster); err != nil {
 			continue
 		}
 

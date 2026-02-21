@@ -88,6 +88,8 @@ func main() {
 		r.Post("/api/admin/draft/start", h.StartDraft)
 		r.Post("/api/admin/draft/pause", h.PauseDraft)
 		r.Post("/api/admin/draft/resume", h.ResumeDraft)
+		r.Post("/api/admin/draft/undo-pick", h.UndoLastPick)
+		r.Post("/api/admin/draft/reset", h.ResetDraft)
 		r.Post("/api/admin/players/import", h.ImportPlayers)
 		r.Put("/api/admin/match/{matchId}", h.UpsertMatch)
 		r.Post("/api/admin/scores/process", h.ProcessScores)
