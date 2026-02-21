@@ -280,6 +280,202 @@ func (h *Handler) SubmitPick(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
+// UndoLastPick handles POST /api/admin/draft/undo-pick.
+// Removes the most recent pick, resets that player to undrafted, removes them
+// from the drafter's roster, and decrements the pick index.
+func (h *Handler) UndoLastPick(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Find the last pick by descending pickNumber.
+	pickDocs, err := h.DB.FS.Collection("draft").Doc("picks").Collection("items").
+		OrderBy("pickNumber", firestore.Desc).Limit(1).Documents(ctx).GetAll()
+	if err != nil {
+		h.Log.Error("undo pick: query picks", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	if len(pickDocs) == 0 {
+		writeError(w, http.StatusBadRequest, "no picks to undo")
+		return
+	}
+
+	var lastPick models.DraftPick
+	if err := pickDocs[0].DataTo(&lastPick); err != nil {
+		writeError(w, http.StatusInternalServerError, "failed to decode last pick")
+		return
+	}
+
+	txErr := h.DB.FS.RunTransaction(ctx, func(ctx context.Context, tx *firestore.Transaction) error {
+		cfgRef := h.DB.FS.Collection("draft").Doc("config")
+		cfgSnap, err := tx.Get(cfgRef)
+		if err != nil {
+			return fmt.Errorf("draft config not found")
+		}
+		var cfg models.DraftConfig
+		if err := cfgSnap.DataTo(&cfg); err != nil {
+			return err
+		}
+
+		rosterRef := h.DB.FS.Collection("rosters").Doc(lastPick.UserID)
+		rosterSnap, err := tx.Get(rosterRef)
+		if err != nil {
+			return fmt.Errorf("roster not found for user %s", lastPick.UserID)
+		}
+		var roster models.Roster
+		if err := rosterSnap.DataTo(&roster); err != nil {
+			return err
+		}
+
+		// Delete the pick document.
+		pickRef := h.DB.FS.Collection("draft").Doc("picks").Collection("items").Doc(fmt.Sprintf("%d", lastPick.PickNumber))
+		if err := tx.Delete(pickRef); err != nil {
+			return err
+		}
+
+		// Reset the player to undrafted.
+		playerRef := h.DB.FS.Collection("players").Doc(lastPick.PlayerID)
+		if err := tx.Update(playerRef, []firestore.Update{
+			{Path: "drafted", Value: false},
+			{Path: "draftedBy", Value: ""},
+		}); err != nil {
+			return err
+		}
+
+		// Remove the player from the drafter's roster.
+		updatedPlayers := make([]models.RosterPlayer, 0, len(roster.Players))
+		for _, rp := range roster.Players {
+			if rp.PlayerID != lastPick.PlayerID {
+				updatedPlayers = append(updatedPlayers, rp)
+			}
+		}
+		if err := tx.Update(rosterRef, []firestore.Update{
+			{Path: "players", Value: updatedPlayers},
+		}); err != nil {
+			return err
+		}
+
+		// Decrement pick index; reactivate draft if it was complete.
+		prevIndex := cfg.CurrentPickIndex - 1
+		if prevIndex < 0 {
+			prevIndex = 0
+		}
+		newStatus := cfg.Status
+		if newStatus == "complete" {
+			newStatus = "active"
+		}
+		round := 1
+		if len(cfg.PickOrder) > 0 {
+			round = prevIndex/len(cfg.PickOrder) + 1
+		}
+		return tx.Update(cfgRef, []firestore.Update{
+			{Path: "currentPickIndex", Value: prevIndex},
+			{Path: "status", Value: newStatus},
+			{Path: "round", Value: round},
+			{Path: "currentPickDeadline", Value: time.Now().UTC().Add(time.Duration(cfg.PickTimeLimitSeconds) * time.Second)},
+		})
+	})
+
+	if txErr != nil {
+		h.Log.Error("undo pick failed", "err", txErr)
+		writeError(w, http.StatusInternalServerError, txErr.Error())
+		return
+	}
+
+	h.Log.Info("pick undone", "player", lastPick.PlayerID, "user", lastPick.UserID, "pick#", lastPick.PickNumber)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":     "ok",
+		"undone":     lastPick.PlayerName,
+		"pickNumber": lastPick.PickNumber,
+	})
+}
+
+// ResetDraft handles POST /api/admin/draft/reset.
+// Wipes all picks, resets all players to undrafted, clears all rosters,
+// clears the leaderboard, and sets draft status back to pending.
+// The pick order and time limit are preserved so the draft can be restarted.
+func (h *Handler) ResetDraft(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	var cfg models.DraftConfig
+	found, err := h.DB.GetDoc(ctx, "draft", "config", &cfg)
+	if err != nil || !found {
+		writeError(w, http.StatusBadRequest, "draft config not found — nothing to reset")
+		return
+	}
+
+	batch := h.DB.FS.Batch()
+
+	// Delete all pick documents.
+	pickDocs, err := h.DB.FS.Collection("draft").Doc("picks").Collection("items").Documents(ctx).GetAll()
+	if err != nil {
+		h.Log.Error("reset draft: list picks", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	for _, pickDoc := range pickDocs {
+		batch.Delete(pickDoc.Ref)
+	}
+
+	// Reset all drafted players to undrafted.
+	playerDocs, err := h.DB.FS.Collection("players").Where("drafted", "==", true).Documents(ctx).GetAll()
+	if err != nil {
+		h.Log.Error("reset draft: list players", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	for _, playerDoc := range playerDocs {
+		batch.Update(playerDoc.Ref, []firestore.Update{
+			{Path: "drafted", Value: false},
+			{Path: "draftedBy", Value: ""},
+		})
+	}
+
+	// Clear all rosters.
+	rosterDocs, err := h.DB.FS.Collection("rosters").Documents(ctx).GetAll()
+	if err != nil {
+		h.Log.Error("reset draft: list rosters", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error")
+		return
+	}
+	for _, rosterDoc := range rosterDocs {
+		batch.Update(rosterDoc.Ref, []firestore.Update{
+			{Path: "players", Value: []models.RosterPlayer{}},
+			{Path: "totalPoints", Value: 0},
+		})
+	}
+
+	// Clear the leaderboard standings.
+	leaderboardRef := h.DB.FS.Collection("leaderboard").Doc("current")
+	batch.Set(leaderboardRef, models.Leaderboard{Standings: []models.LeaderboardEntry{}})
+
+	// Reset draft config to pending, preserving pick order and time limit.
+	cfgRef := h.DB.FS.Collection("draft").Doc("config")
+	batch.Update(cfgRef, []firestore.Update{
+		{Path: "status", Value: "pending"},
+		{Path: "currentPickIndex", Value: 0},
+		{Path: "round", Value: 1},
+		{Path: "currentPickDeadline", Value: time.Time{}},
+	})
+
+	if _, err := batch.Commit(ctx); err != nil {
+		h.Log.Error("reset draft: commit batch", "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error committing reset")
+		return
+	}
+
+	h.Log.Info("draft reset",
+		"picks_deleted", len(pickDocs),
+		"players_reset", len(playerDocs),
+		"rosters_cleared", len(rosterDocs),
+	)
+	writeJSON(w, http.StatusOK, map[string]any{
+		"status":         "reset",
+		"picksDeleted":   len(pickDocs),
+		"playersReset":   len(playerDocs),
+		"rostersCleared": len(rosterDocs),
+	})
+}
+
 // shuffleStrings returns a shuffled copy of s.
 func shuffleStrings(s []string) []string {
 	out := make([]string, len(s))

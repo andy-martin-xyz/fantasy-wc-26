@@ -77,9 +77,9 @@ func callAnthropic(apiKey string, roster []suggestRosterPlayer, available []sugg
 	if len(top) > 20 {
 		top = top[:20]
 	}
-	availLines := make([]string, len(top))
+	topPlayerLines := make([]string, len(top))
 	for i, p := range top {
-		availLines[i] = fmt.Sprintf("- %s, %s, %s, rating %d", p.Name, p.Country, p.Position, p.Rating)
+		topPlayerLines[i] = fmt.Sprintf("- %s, %s, %s, rating %d", p.Name, p.Country, p.Position, p.Rating)
 	}
 
 	prompt := fmt.Sprintf(`You are advising a friend in a World Cup 2026 fantasy soccer draft.
@@ -93,7 +93,7 @@ Respond in exactly this format (nothing else):
 1. [Player Name] — [one sentence reason]
 2. [Player Name] — [one sentence reason]
 3. [Player Name] — [one sentence reason]`,
-		rosterDesc, strings.Join(availLines, "\n"))
+		rosterDesc, strings.Join(topPlayerLines, "\n"))
 
 	reqBody := map[string]interface{}{
 		"model":      "claude-sonnet-4-6",
@@ -124,20 +124,20 @@ Respond in exactly this format (nothing else):
 		return nil, fmt.Errorf("anthropic %d: %s", resp.StatusCode, body)
 	}
 
-	var ar struct {
+	var anthropicResp struct {
 		Content []struct {
 			Type string `json:"type"`
 			Text string `json:"text"`
 		} `json:"content"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&ar); err != nil {
+	if err := json.NewDecoder(resp.Body).Decode(&anthropicResp); err != nil {
 		return nil, err
 	}
-	if len(ar.Content) == 0 {
+	if len(anthropicResp.Content) == 0 {
 		return nil, fmt.Errorf("empty response from anthropic")
 	}
 
-	return parseSuggestResponse(ar.Content[0].Text), nil
+	return parseSuggestResponse(anthropicResp.Content[0].Text), nil
 }
 
 func parseSuggestResponse(text string) *SuggestResponse {
