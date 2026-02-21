@@ -86,8 +86,13 @@ var testPlayers = []seedPlayer{
 }
 
 func main() {
-	if os.Getenv("FIRESTORE_EMULATOR_HOST") == "" {
-		log.Fatal("FIRESTORE_EMULATOR_HOST is not set — only run this against the local emulator")
+	emulator := os.Getenv("FIRESTORE_EMULATOR_HOST") != ""
+	production := os.Getenv("SEED_PRODUCTION") == "true"
+	if !emulator && !production {
+		log.Fatal("Set FIRESTORE_EMULATOR_HOST for the local emulator, or SEED_PRODUCTION=true to seed production Firestore")
+	}
+	if production && !emulator {
+		fmt.Println("WARNING: seeding PRODUCTION Firestore")
 	}
 
 	projectID := os.Getenv("FIREBASE_PROJECT_ID")

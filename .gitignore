@@ -67,3 +67,18 @@ node_modules/
 
 # dataconnect generated files
 .dataconnect
+
+# Go compiled binaries
+/server
+/seed
+*.exe
+
+# Claude Code local settings
+.claude/
+
+# Go test cache
+/tmp/
+
+# Local keys — never commit credentials
+*.json.key
+keys/
