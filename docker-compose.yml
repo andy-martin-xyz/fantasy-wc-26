@@ -1,0 +1,40 @@
+services:
+
+  # Firebase Auth + Firestore emulators
+  emulators:
+    image: andreysenov/firebase-tools
+    working_dir: /app
+    volumes:
+      - .:/app
+    ports:
+      - "9099:9099"   # Auth emulator
+      - "8080:8080"   # Firestore emulator
+      - "4000:4000"   # Emulator UI
+    command: firebase emulators:start --only auth,firestore
+
+  # Go API server
+  api:
+    image: golang:1.26-alpine
+    ports:
+      - "8081:8081"
+    environment:
+      - PORT=8081
+      - FIREBASE_PROJECT_ID=andy-personal-1bb38
+      - FIRESTORE_EMULATOR_HOST=emulators:8080
+      - FIREBASE_AUTH_EMULATOR_HOST=emulators:9099
+      - GOOGLE_APPLICATION_CREDENTIALS=/keys/fantasy-wc-sa.json
+    volumes:
+      - .:/app
+      - /Users/andrewmartin/keys:/keys:ro
+    working_dir: /app
+    command: go run ./cmd/server
+    depends_on:
+      - emulators
+
+  # Static frontend (serves public/)
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "3000:80"
+    volumes:
+      - ./public:/usr/share/nginx/html:ro
