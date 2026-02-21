@@ -19,6 +19,18 @@ A real-time fantasy soccer draft app for World Cup 2026, built for a small frien
 
 ## Local Development
 
+### Docker (recommended)
+
+Requires: Docker Desktop
+
+```bash
+docker compose up
+```
+
+App: http://localhost:3000 · API: http://localhost:8081 · Emulator UI: http://localhost:4000
+
+### Manual (three terminals)
+
 Requires: Go 1.25+, Firebase CLI, Java (for Firestore emulator)
 
 ```bash
@@ -26,10 +38,10 @@ Requires: Go 1.25+, Firebase CLI, Java (for Firestore emulator)
 firebase emulators:start
 
 # Terminal 2 — Go API server
-./dev.sh
+./scripts/dev.sh
 
 # Terminal 3 — Static file server
-python3 -m http.server 3000
+python3 -m http.server 3000 --directory public
 ```
 
 App: http://localhost:3000 · Emulator UI: http://localhost:4000
@@ -37,7 +49,11 @@ App: http://localhost:3000 · Emulator UI: http://localhost:4000
 ### Seed test players
 
 ```bash
-./seed.sh
+# Docker
+docker compose exec api go run ./cmd/seed
+
+# Manual
+./scripts/seed.sh
 ```
 
 ## Deployment
@@ -60,6 +76,7 @@ internal/
   middleware/       Auth + admin middleware
   models/          Firestore data types + scoring logic
   db/              Firestore client wrapper
-js/                Frontend JS (Alpine.js, Firebase, API client)
-css/               Design system (dark mode, mobile-first)
+public/            Firebase Hosting root (HTML pages, CSS, JS)
+scripts/           Dev and seed shell scripts
+docs/              Project docs and planning notes
 ```

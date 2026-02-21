@@ -1,18 +1,10 @@
 {
   "hosting": {
-    "public": ".",
+    "public": "public",
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**",
-      "cmd/**",
-      "internal/**",
-      "go.mod",
-      "go.sum",
-      "Dockerfile",
-      "dev.sh",
-      "seed.sh",
-      "*.md"
+      "**/node_modules/**"
     ],
     "rewrites": [
       {
@@ -29,13 +21,16 @@
   },
   "emulators": {
     "auth": {
+      "host": "0.0.0.0",
       "port": 9099
     },
     "firestore": {
+      "host": "0.0.0.0",
       "port": 8080
     },
     "ui": {
       "enabled": true,
+      "host": "0.0.0.0",
       "port": 4000
     },
     "singleProjectMode": true
