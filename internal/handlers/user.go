@@ -44,14 +44,15 @@ func (h *Handler) RegisterUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	email := middleware.EmailFromContext(r.Context())
 	user := models.User{
 		UID:         uid,
 		DisplayName: middleware.DisplayNameFromContext(r.Context()),
-		Email:       middleware.EmailFromContext(r.Context()),
+		Email:       email,
 		PhotoURL:    middleware.PhotoURLFromContext(r.Context()),
 		TeamName:    req.TeamName,
 		CreatedAt:   time.Now().UTC(),
-		IsAdmin:     false,
+		IsAdmin:     h.isAdminEmail(email),
 	}
 
 	if err := h.DB.SetDoc(r.Context(), "users", uid, user); err != nil {
