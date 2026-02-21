@@ -8,6 +8,8 @@ import (
 )
 
 // GetLeaderboard handles GET /api/leaderboard — public, no auth.
+// Before any scores are processed, falls back to all registered users with 0 pts
+// so the standings page shows who has signed up even before the draft.
 func (h *Handler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	var lb models.Leaderboard
 	found, err := h.DB.GetDoc(r.Context(), "leaderboard", "current", &lb)
@@ -16,12 +18,33 @@ func (h *Handler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "internal error")
 		return
 	}
-	if !found {
-		// Return empty leaderboard before any scores are processed.
+	if found && len(lb.Standings) > 0 {
+		writeJSON(w, http.StatusOK, lb)
+		return
+	}
+
+	// No standings yet (pre-draft) — show all registered users with 0 pts.
+	docs, err := h.DB.FS.Collection("users").Documents(r.Context()).GetAll()
+	if err != nil {
+		h.Log.Error("get users for pre-draft standings", "err", err)
 		writeJSON(w, http.StatusOK, models.Leaderboard{Standings: []models.LeaderboardEntry{}})
 		return
 	}
-	writeJSON(w, http.StatusOK, lb)
+	standings := make([]models.LeaderboardEntry, 0, len(docs))
+	for _, doc := range docs {
+		var u models.User
+		if err := doc.DataTo(&u); err != nil {
+			continue
+		}
+		standings = append(standings, models.LeaderboardEntry{
+			UserID:      u.UID,
+			DisplayName: u.DisplayName,
+			PhotoURL:    u.PhotoURL,
+			TeamName:    u.TeamName,
+			TotalPoints: 0,
+		})
+	}
+	writeJSON(w, http.StatusOK, models.Leaderboard{Standings: standings})
 }
 
 // GetTeam handles GET /api/team/{uid} — public, no auth.
