@@ -18,7 +18,12 @@
       "Bash(curl:*)",
       "Bash(go build:*)",
       "Bash(gcloud auth list:*)",
-      "Bash(firebase --version:*)"
+      "Bash(firebase --version:*)",
+      "Bash(chmod:*)",
+      "Bash(git commit -m \"Initial commit with draft test fixes and project structure\")",
+      "Bash(./scripts/seed-prod.sh:*)",
+      "Bash(docker compose:*)",
+      "Bash(brew list:*)"
     ]
   }
 }
