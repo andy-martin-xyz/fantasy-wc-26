@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version:*)",
+      "Bash(which:*)",
+      "Bash(brew info:*)",
+      "Bash(brew install:*)",
+      "Bash(/opt/homebrew/bin/go version:*)",
+      "Bash(/opt/homebrew/bin/go mod:*)",
+      "Bash(/opt/homebrew/bin/go get:*)",
+      "Bash(/opt/homebrew/bin/go build:*)",
+      "Bash(go test ./internal/handlers -v -run Test)",
+      "Bash(go get github.com/stretchr/testify)",
+      "Bash(go mod tidy)",
+      "Bash(find /Users/andrewmartin/git/fantasy-league -name \"*test*\" -type f -exec grep -l \"MockDBClient\\\\|mock.*DB\" {} ;)",
+      "Bash(go test:*)",
+      "Bash(go build -o /tmp/fantasy-league ./cmd/server)",
+      "Bash(curl:*)",
+      "Bash(go build:*)",
+      "Bash(gcloud auth list:*)",
+      "Bash(firebase --version:*)"
+    ]
+  }
+}

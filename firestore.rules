@@ -1,0 +1,37 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // All writes go through the Go API (Admin SDK bypasses rules).
+    // Client-side reads are needed for Firestore onSnapshot listeners in draft.html.
+
+    // Authenticated users can read draft state and picks.
+    match /draft/{document=**} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Authenticated users can read player list and rosters.
+    match /players/{playerId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    match /rosters/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Leaderboard is public.
+    match /leaderboard/{document=**} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // Users — authenticated read only.
+    match /users/{uid} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+  }
+}

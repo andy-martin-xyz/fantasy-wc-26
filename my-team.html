@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>My Team — WC Fantasy 2026</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script defer src="js/config.js"></script>
+  <script defer src="js/app.js"></script>
+  <script defer src="js/auth.js"></script>
+  <script defer src="js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- Nav -->
+    <nav class="nav">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">⚽</span>
+        <span class="brand-text">WC <span>Fantasy</span></span>
+      </a>
+      <div class="nav-actions" x-data>
+        <div class="spinner" x-show="$store.auth.authLoading"></div>
+        <a href="login.html" class="nav-link" x-show="!$store.auth.authLoading && !$store.auth.isLoggedIn" x-cloak>Sign In</a>
+        <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
+          <a href="draft.html" class="nav-link">Draft</a>
+          <a href="my-team.html" class="nav-link active">My Team</a>
+          <a href="admin.html" class="nav-link" x-show="$store.auth.isAdmin">Admin</a>
+          <div class="nav-avatar"
+               :class="'avatar-' + $store.auth.user?.colorIdx"
+               x-text="$store.auth.user?.initials"></div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- My Team -->
+    <main class="page-content" x-data="myTeamPage()"
+          @auth-ready.window="load()"
+          x-init="maybeLoad()">
+
+      <!-- Loading -->
+      <template x-if="loading">
+        <div class="empty-state">
+          <div class="spinner" style="margin:0 auto"></div>
+        </div>
+      </template>
+
+      <!-- Empty roster (post-draft, no picks yet) -->
+      <template x-if="!loading && team && team.players.length === 0">
+        <div>
+          <div class="team-header-card">
+            <div style="font-size:var(--text-2xl);font-weight:800" x-text="team.teamName"></div>
+            <div class="team-total-points">0</div>
+            <div class="team-total-label">total points</div>
+          </div>
+          <div class="empty-state">
+            <div class="empty-state-icon">📋</div>
+            <div class="empty-state-text">Your roster is empty — draft starts soon!</div>
+          </div>
+        </div>
+      </template>
+
+      <!-- Full roster -->
+      <template x-if="!loading && team && team.players.length > 0">
+        <div>
+          <div class="team-header-card">
+            <template x-if="$store.auth.user?.photoURL">
+              <div class="avatar avatar-lg" style="margin:0 auto"><img :src="$store.auth.user.photoURL"></div>
+            </template>
+            <template x-if="!$store.auth.user?.photoURL">
+              <div class="avatar avatar-lg"
+                   :class="'avatar-' + $store.auth.user?.colorIdx"
+                   x-text="$store.auth.user?.initials"
+                   style="margin:0 auto"></div>
+            </template>
+            <div class="team-total-points" x-text="team.totalPoints"></div>
+            <div class="team-total-label">total points</div>
+            <div style="margin-top:12px">
+              <div style="font-size:var(--text-lg);font-weight:800" x-text="team.teamName"></div>
+            </div>
+          </div>
+
+          <!-- Scoring legend -->
+          <div class="card" style="margin-bottom:16px">
+            <div class="section-label">Scoring</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 16px">
+              <div class="stat-row"><span class="stat-label">Goal</span><span class="stat-value text-success">+5</span></div>
+              <div class="stat-row"><span class="stat-label">Assist</span><span class="stat-value text-success">+3</span></div>
+              <div class="stat-row"><span class="stat-label">Clean sheet</span><span class="stat-value text-success">+4</span></div>
+              <div class="stat-row"><span class="stat-label">Team win</span><span class="stat-value text-success">+2</span></div>
+              <div class="stat-row"><span class="stat-label">Yellow card</span><span class="stat-value text-danger">-1</span></div>
+              <div class="stat-row"><span class="stat-label">Red card</span><span class="stat-value text-danger">-3</span></div>
+            </div>
+          </div>
+
+          <template x-for="group in positionGroups" :key="group.pos">
+            <div class="position-group" x-show="group.players.length">
+              <div class="position-group-header">
+                <span class="badge" :class="'badge-' + group.pos.toLowerCase()" x-text="group.pos"></span>
+                <span class="position-group-title" x-text="group.label"></span>
+              </div>
+              <template x-for="p in group.players" :key="p.playerId">
+                <div class="player-card">
+                  <div>
+                    <div class="player-name" x-text="p.name"></div>
+                    <div class="player-meta"><span x-text="p.country"></span></div>
+                  </div>
+                  <div class="player-points" x-text="'+' + (p.totalPoints || 0)"></div>
+                </div>
+              </template>
+            </div>
+          </template>
+        </div>
+      </template>
+
+    </main>
+  </div>
+
+  <script>
+    function myTeamPage() {
+      return {
+        team: null,
+        loading: false,
+
+        maybeLoad() {
+          // If auth is already resolved (returning to page), load immediately.
+          // Otherwise wait for auth-ready event fired by auth.js.
+          if (!Alpine.store('auth').authLoading) {
+            this.load();
+          } else {
+            this.$watch('$store.auth.authLoading', v => { if (!v) this.load(); });
+          }
+        },
+
+        async load() {
+          const uid = Alpine.store('auth').user?.uid;
+          if (!uid) return; // auth.js will redirect to login if needed
+          this.loading = true;
+          try {
+            this.team = await Api.getTeam(uid);
+          } catch (e) {
+            // Team not yet created (before draft) is fine.
+            this.team = { teamName: Alpine.store('auth').user?.teamName || 'My Team', players: [], totalPoints: 0 };
+          } finally {
+            this.loading = false;
+          }
+        },
+
+        get positionGroups() {
+          const players = this.team?.players || [];
+          return [
+            { pos: 'GK',  label: 'Goalkeeper',  players: players.filter(p => p.position === 'GK')  },
+            { pos: 'DEF', label: 'Defenders',    players: players.filter(p => p.position === 'DEF') },
+            { pos: 'MID', label: 'Midfielders',  players: players.filter(p => p.position === 'MID') },
+            { pos: 'FWD', label: 'Forwards',     players: players.filter(p => p.position === 'FWD') },
+          ];
+        },
+      };
+    }
+  </script>
+</body>
+</html>
