@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
+	"os"
+	"strings"
 
 	"firebase.google.com/go/v4/auth"
 	"github.com/andrewmartin/fantasy-league/internal/db"
@@ -12,14 +14,27 @@ import (
 
 // Handler holds shared dependencies for all route handlers.
 type Handler struct {
-	DB   *db.Client
-	Auth *auth.Client
-	Log  *slog.Logger
+	DB          *db.Client
+	Auth        *auth.Client
+	Log         *slog.Logger
+	adminEmails map[string]bool
 }
 
 // New creates a Handler with the given dependencies.
+// Admin emails are read from the ADMIN_EMAILS environment variable (comma-separated).
 func New(dbClient *db.Client, authClient *auth.Client, log *slog.Logger) *Handler {
-	return &Handler{DB: dbClient, Auth: authClient, Log: log}
+	adminEmails := map[string]bool{}
+	for _, e := range strings.Split(os.Getenv("ADMIN_EMAILS"), ",") {
+		if e := strings.TrimSpace(strings.ToLower(e)); e != "" {
+			adminEmails[e] = true
+		}
+	}
+	return &Handler{DB: dbClient, Auth: authClient, Log: log, adminEmails: adminEmails}
+}
+
+// isAdminEmail reports whether the given email is in the admin list.
+func (h *Handler) isAdminEmail(email string) bool {
+	return h.adminEmails[strings.ToLower(email)]
 }
 
 // --- Response helpers -------------------------------------------

@@ -36,7 +36,7 @@
     </nav>
 
     <main class="page-content" x-data="adminPage()"
-          x-init="$watch('$store.auth.authLoading', v => { if (!v) checkAccess(); }); if (!$store.auth.authLoading) checkAccess();">
+          x-init="$watch('$store.auth.authLoading', v => { if (!v) checkAccess(); }); $watch('$store.auth.isAdmin', v => { if (v) loadDraftStatus(); }); if (!$store.auth.authLoading) checkAccess();">
 
       <!-- Loading -->
       <div x-show="$store.auth.authLoading" class="empty-state">
