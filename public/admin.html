@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Admin — WC Fantasy 2026</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script defer src="js/config.js"></script>
+  <script defer src="js/app.js"></script>
+  <script defer src="js/auth.js"></script>
+  <script defer src="js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+</head>
+<body>
+  <div class="app-wrapper">
+
+    <!-- Nav -->
+    <nav class="nav">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">⚽</span>
+        <span class="brand-text">WC <span>Fantasy</span></span>
+      </a>
+      <div class="nav-actions" x-data>
+        <div class="spinner" x-show="$store.auth.authLoading"></div>
+        <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
+          <a href="draft.html" class="nav-link">Draft</a>
+          <a href="my-team.html" class="nav-link">My Team</a>
+          <a href="admin.html" class="nav-link active">Admin</a>
+          <div class="nav-avatar"
+               :class="'avatar-' + $store.auth.user?.colorIdx"
+               x-text="$store.auth.user?.initials"></div>
+        </div>
+      </div>
+    </nav>
+
+    <main class="page-content" x-data="adminPage()"
+          x-init="$watch('$store.auth.authLoading', v => { if (!v) checkAccess(); }); if (!$store.auth.authLoading) checkAccess();">
+
+      <!-- Loading -->
+      <div x-show="$store.auth.authLoading" class="empty-state">
+        <div class="spinner" style="margin:0 auto"></div>
+      </div>
+
+      <!-- Access denied -->
+      <div x-show="!$store.auth.authLoading && !$store.auth.isAdmin" x-cloak class="empty-state">
+        <div class="empty-state-icon">🔒</div>
+        <div class="empty-state-text">Admin access required</div>
+        <a href="index.html" class="btn btn-secondary" style="margin-top:16px">Go to Standings</a>
+      </div>
+
+      <!-- Admin panel -->
+      <div x-show="$store.auth.isAdmin" x-cloak>
+
+        <div class="page-header">
+          <h1 class="page-title">Admin Panel</h1>
+          <p class="page-subtitle">Manage draft, scores, and players</p>
+        </div>
+
+        <!-- Draft Controls -->
+        <div class="admin-section">
+          <div class="admin-section-title">🎯 Draft Controls</div>
+          <div style="margin-bottom:12px" x-show="draftStatus">
+            <div class="stat-row">
+              <span class="stat-label">Status</span>
+              <span class="badge"
+                    :class="draftStatus === 'active' ? 'badge-mid' : draftStatus === 'complete' ? 'badge-def' : 'badge-gk'"
+                    x-text="draftStatus || '—'"></span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">Pick</span>
+              <span class="stat-value">Round <span x-text="draftRound"></span>, #<span x-text="draftPickIndex + 1"></span></span>
+            </div>
+            <div class="stat-row">
+              <span class="stat-label">On the clock</span>
+              <span class="stat-value" x-text="draftPickerUID || '—'"></span>
+            </div>
+          </div>
+          <div class="admin-controls">
+            <button class="btn btn-success" :disabled="busy || draftStatus === 'active' || draftStatus === 'complete'" @click="draftAction('start')">
+              <span x-show="!busy">▶ Start</span>
+              <span x-show="busy" class="spinner"></span>
+            </button>
+            <button class="btn btn-warning" :disabled="busy || draftStatus !== 'active'" @click="draftAction('pause')">⏸ Pause</button>
+            <button class="btn btn-primary" :disabled="busy || draftStatus !== 'paused'" @click="draftAction('resume')">▶ Resume</button>
+            <button class="btn btn-secondary" @click="loadDraftStatus()">↻ Refresh</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Draft Recovery -->
+        <div class="admin-section">
+          <div class="admin-section-title">🔧 Draft Recovery</div>
+          <p style="color:var(--color-text-muted);font-size:var(--text-sm);margin-bottom:16px">
+            Emergency controls for correcting mistakes mid-draft.
+          </p>
+
+          <!-- Undo Last Pick -->
+          <div style="margin-bottom:12px">
+            <div x-show="confirmAction !== 'undo'" class="admin-controls">
+              <button class="btn btn-warning" :disabled="busy || !draftStatus || draftStatus === 'pending'"
+                      @click="confirmAction = 'undo'">
+                ↩ Undo Last Pick
+              </button>
+            </div>
+            <div x-show="confirmAction === 'undo'" style="background:var(--color-surface);border:1px solid var(--color-warning, #f59e0b);border-radius:8px;padding:12px">
+              <p style="margin:0 0 10px;font-size:var(--text-sm)">Remove the most recent pick and return that player to the pool?</p>
+              <div class="admin-controls">
+                <button class="btn btn-warning" :disabled="busy" @click="executeRecovery('undo')">
+                  <span x-show="!busy">Confirm Undo</span>
+                  <span x-show="busy" class="spinner"></span>
+                </button>
+                <button class="btn btn-secondary" :disabled="busy" @click="confirmAction = null">Cancel</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Reset Draft -->
+          <div>
+            <div x-show="confirmAction !== 'reset'" class="admin-controls">
+              <button class="btn btn-secondary" :disabled="busy || !draftStatus || draftStatus === 'pending'"
+                      style="border-color:#ef4444;color:#ef4444"
+                      @click="confirmAction = 'reset'">
+                ⚠ Reset Draft
+              </button>
+            </div>
+            <div x-show="confirmAction === 'reset'" style="background:var(--color-surface);border:1px solid #ef4444;border-radius:8px;padding:12px">
+              <p style="margin:0 0 4px;font-size:var(--text-sm);font-weight:600;color:#ef4444">This will delete all picks, clear all rosters, and reset the draft to pending.</p>
+              <p style="margin:0 0 10px;font-size:var(--text-sm);color:var(--color-text-muted)">Pick order and time limit are preserved. This cannot be undone.</p>
+              <div class="admin-controls">
+                <button class="btn btn-secondary" :disabled="busy" style="background:#ef4444;color:#fff;border-color:#ef4444"
+                        @click="executeRecovery('reset')">
+                  <span x-show="!busy">Yes, Reset Everything</span>
+                  <span x-show="busy" class="spinner"></span>
+                </button>
+                <button class="btn btn-secondary" :disabled="busy" @click="confirmAction = null">Cancel</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Draft Order -->
+        <div class="admin-section">
+          <div class="admin-section-title">🔀 Draft Order</div>
+          <div style="margin-bottom:12px">
+            <template x-for="(uid, i) in draftOrder" :key="uid">
+              <div class="order-item">
+                <div class="order-num" x-text="i + 1"></div>
+                <div class="order-name" x-text="uid"></div>
+              </div>
+            </template>
+            <div x-show="draftOrder.length === 0" style="color:var(--color-text-muted);font-size:var(--text-sm)">
+              No order set yet.
+            </div>
+          </div>
+          <div class="admin-controls">
+            <button class="btn btn-secondary" :disabled="busy" @click="randomizeOrder()">🎲 Randomize</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Match Result -->
+        <div class="admin-section">
+          <div class="admin-section-title">⚽ Match Result</div>
+          <div class="form-group">
+            <label class="form-label">Match ID</label>
+            <input class="form-input" type="text" placeholder="e.g. fra-arg-group-a" x-model="match.id">
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <div>
+                <label class="form-label">Home Team</label>
+                <input class="form-input" type="text" placeholder="France" x-model="match.homeTeam">
+              </div>
+              <div>
+                <label class="form-label">Away Team</label>
+                <input class="form-input" type="text" placeholder="Argentina" x-model="match.awayTeam">
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <div class="form-row">
+              <div>
+                <label class="form-label">Home Score</label>
+                <input class="form-input" type="number" min="0" placeholder="0" x-model="match.homeScore">
+              </div>
+              <div>
+                <label class="form-label">Away Score</label>
+                <input class="form-input" type="number" min="0" placeholder="0" x-model="match.awayScore">
+              </div>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Stage</label>
+            <select class="form-select" x-model="match.stage">
+              <option value="group">Group Stage</option>
+              <option value="r16">Round of 16</option>
+              <option value="quarter">Quarter-Final</option>
+              <option value="semi">Semi-Final</option>
+              <option value="final">Final</option>
+            </select>
+          </div>
+          <div class="admin-controls">
+            <button class="btn btn-primary" :disabled="busy" @click="submitMatch()">Save Match</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Process Scores -->
+        <div class="admin-section">
+          <div class="admin-section-title">⚡ Process Scores</div>
+          <p style="color:var(--color-text-muted);font-size:var(--text-sm);margin-bottom:12px">
+            Paste a JSON array of player stats for a match. Points are calculated and leaderboard is updated.
+          </p>
+          <div class="form-group">
+            <label class="form-label">Match ID</label>
+            <input class="form-input" type="text" placeholder="fra-arg-group-a" x-model="scores.matchId">
+          </div>
+          <div class="form-group">
+            <label class="form-label">Player Stats (JSON)</label>
+            <textarea class="form-textarea"
+                      style="min-height:160px;font-family:var(--font-mono);font-size:var(--text-xs)"
+                      placeholder='[{"playerId":"kylian-mbappe_france","goals":2,"assists":0,"cleanSheet":false,"yellowCards":0,"redCards":0,"teamWin":true,"teamDraw":false}]'
+                      x-model="scores.statsJson"></textarea>
+          </div>
+          <div class="admin-controls">
+            <button class="btn btn-primary" :disabled="busy" @click="processScores()">⚡ Process</button>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Player Import -->
+        <div class="admin-section">
+          <div class="admin-section-title">📋 Import Players</div>
+          <p style="color:var(--color-text-muted);font-size:var(--text-sm);margin-bottom:12px">
+            Required fields: name, country, position (GK/DEF/MID/FWD). Optional: clubTeam, rating, imageURL.
+          </p>
+          <div class="form-group">
+            <textarea class="form-textarea"
+                      style="min-height:140px;font-family:var(--font-mono);font-size:var(--text-xs)"
+                      placeholder='[{"name":"Erling Haaland","country":"Norway","position":"FWD","clubTeam":"Man City","rating":95}]'
+                      x-model="importJson"></textarea>
+          </div>
+          <div class="admin-controls">
+            <button class="btn btn-primary" :disabled="busy" @click="importPlayers()">Import</button>
+            <button class="btn btn-secondary" @click="importJson = exampleJson">Load Example</button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Toast -->
+      <div class="toast" x-show="toast" x-transition style="display:none" x-text="toastMsg"></div>
+
+    </main>
+  </div>
+
+  <script>
+    function adminPage() {
+      return {
+        busy: false,
+        confirmAction: null,
+        draftStatus: null,
+        draftRound: 1,
+        draftPickIndex: 0,
+        draftPickerUID: null,
+        draftOrder: [],
+        match: { id: '', homeTeam: '', awayTeam: '', homeScore: 0, awayScore: 0, stage: 'group' },
+        scores: { matchId: '', statsJson: '' },
+        importJson: '',
+        exampleJson: JSON.stringify([
+          { name: 'Erling Haaland', country: 'Norway', position: 'FWD', clubTeam: 'Man City', rating: 95 },
+          { name: 'Lamine Yamal',   country: 'Spain',  position: 'FWD', clubTeam: 'Barcelona', rating: 90 },
+        ], null, 2),
+        toast: false,
+        toastMsg: '',
+
+        checkAccess() {
+          if (Alpine.store('auth').isAdmin) {
+            this.loadDraftStatus();
+          }
+        },
+
+        async loadDraftStatus() {
+          try {
+            const s = await Api.getDraftStatus();
+            this.draftStatus    = s.status;
+            this.draftRound     = s.round || 1;
+            this.draftPickIndex = s.currentPickIndex || 0;
+            this.draftPickerUID = s.currentPickerUID || null;
+            this.draftOrder     = s.pickOrder || [];
+          } catch (e) {
+            // Draft not configured yet is fine.
+          }
+        },
+
+        async draftAction(action) {
+          this.busy = true;
+          try {
+            const actions = { start: Api.startDraft, pause: Api.pauseDraft, resume: Api.resumeDraft };
+            await actions[action].call(Api);
+            this.showToast('Draft ' + action + 'd.');
+            await this.loadDraftStatus();
+          } catch (e) {
+            this.showToast('Error: ' + (e.message || action + ' failed'));
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async executeRecovery(action) {
+          this.busy = true;
+          try {
+            if (action === 'undo') {
+              const res = await Api.undoLastPick();
+              this.showToast('Undone: ' + res.undone + ' (pick #' + res.pickNumber + ')');
+            } else if (action === 'reset') {
+              const res = await Api.resetDraft();
+              this.showToast('Draft reset. ' + res.picksDeleted + ' picks deleted, ' + res.rostersCleared + ' rosters cleared.');
+            }
+            this.confirmAction = null;
+            await this.loadDraftStatus();
+          } catch (e) {
+            this.showToast('Error: ' + (e.message || action + ' failed'));
+            this.confirmAction = null;
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async randomizeOrder() {
+          this.busy = true;
+          try {
+            const res = await Api.setDraftOrder([], true);
+            this.draftOrder = res.pickOrder || [];
+            this.showToast('Draft order randomized!');
+          } catch (e) {
+            this.showToast('Error: ' + e.message);
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async submitMatch() {
+          if (!this.match.id || !this.match.homeTeam || !this.match.awayTeam) {
+            this.showToast('Match ID and both team names are required.');
+            return;
+          }
+          this.busy = true;
+          try {
+            await Api.upsertMatch(this.match.id, {
+              homeTeam: this.match.homeTeam,
+              awayTeam: this.match.awayTeam,
+              homeScore: parseInt(this.match.homeScore) || 0,
+              awayScore: parseInt(this.match.awayScore) || 0,
+              stage: this.match.stage,
+              status: 'complete',
+            });
+            this.showToast('Match saved: ' + this.match.homeTeam + ' vs ' + this.match.awayTeam);
+          } catch (e) {
+            this.showToast('Error: ' + e.message);
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async processScores() {
+          if (!this.scores.matchId) { this.showToast('Match ID is required.'); return; }
+          let stats;
+          try {
+            stats = JSON.parse(this.scores.statsJson);
+            if (!Array.isArray(stats)) throw new Error();
+          } catch {
+            this.showToast('Invalid JSON — expected an array of stat objects.');
+            return;
+          }
+          this.busy = true;
+          try {
+            const res = await Api.processScores(this.scores.matchId, stats);
+            this.showToast('Processed ' + res.processed + ' player(s). Leaderboard updated!');
+          } catch (e) {
+            this.showToast('Error: ' + e.message);
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        async importPlayers() {
+          let players;
+          try {
+            players = JSON.parse(this.importJson);
+            if (!Array.isArray(players)) throw new Error();
+          } catch {
+            this.showToast('Invalid JSON — expected an array.');
+            return;
+          }
+          this.busy = true;
+          try {
+            const res = await Api.importPlayers(players);
+            this.showToast('Imported ' + res.upserted + ' player(s).' + (res.errors?.length ? ' ' + res.errors.length + ' error(s).' : ''));
+          } catch (e) {
+            this.showToast('Error: ' + e.message);
+          } finally {
+            this.busy = false;
+          }
+        },
+
+        showToast(msg) {
+          this.toastMsg = msg;
+          this.toast = true;
+          setTimeout(() => { this.toast = false; }, 3000);
+        },
+      };
+    }
+  </script>
+</body>
+</html>
