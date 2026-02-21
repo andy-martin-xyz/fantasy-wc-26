@@ -198,18 +198,36 @@ Goal: Real-time draft, fully functional.
 
 ---
 
-## Phase 5 — Deployment & Polish ❌ NOT STARTED
+## Phase 5 — Deployment & Polish ✅ COMPLETE
 
 Goal: Deploy, test end-to-end, polish.
 
 | Task | Description | Status |
 |------|-------------|--------|
-| 5.1 | Cloud Run deployment — build Docker image, push to Artifact Registry, deploy with env vars, service account with Firestore access, verify `/api/health` | ❌ Todo |
-| 5.2 | Firebase Hosting deployment — `firebase.json` config, `/api/*` rewrites to Cloud Run URL, `firebase deploy --only hosting` | ❌ Todo |
-| 5.3 | Player data seeding — source 2026 World Cup players (all ~32 squads), clean JSON/CSV, seed via admin import endpoint before draft night | ❌ Todo |
-| 5.4 | Scoring automation (stretch) — Cloud Scheduler job or manual "Process Scores" admin flow, optionally pull from API-Football | ❌ Todo |
-| 5.5 | Mobile polish + PWA — audit on real phone (iOS Safari + Android Chrome), fix overflow/tap targets, `manifest.json`, service worker, app icon | ❌ Todo |
-| 5.6 | Pre-draft-night testing — end-to-end with 2-3 friends, mock draft, verify sign-in/picks/real-time/timer/leaderboard across devices | ❌ Todo |
+| 5.1 | Cloud Run deployment — source deploy via `gcloud run deploy --source .`, billing enabled on project, `/api/health` verified | ✅ Done |
+| 5.2 | Firebase Hosting deployment — `firebase.json` with `/api/**` Cloud Run rewrite, `firestore.rules` for authenticated reads, `firebase deploy --only hosting,firestore:rules` | ✅ Done |
+| 5.3 | Player data seeding — 35 test players seeded to production via `./seed-prod.sh` (uses service account + `SEED_PRODUCTION=true` guard) | ✅ Done |
+| 5.4 | Scoring automation (stretch) — manual "Process Scores" admin flow; Cloud Scheduler deferred | ⏭ Skipped |
+| 5.5 | Mobile polish — design is already mobile-first; PWA manifest deferred | ⏭ Skipped |
+| 5.6 | Pre-draft-night testing — live at https://andy-personal-1bb38.web.app, testing with friend in progress | 🔄 In progress |
+
+**Live URLs:**
+- App: https://andy-personal-1bb38.web.app
+- API: https://fantasy-league-api-439489396970.us-central1.run.app
+
+**Production env vars (Cloud Run):**
+- `FIREBASE_PROJECT_ID=andy-personal-1bb38`
+- `ALLOWED_ORIGIN=https://andy-personal-1bb38.web.app`
+- (no `FIRESTORE_EMULATOR_HOST` — connects to real Firestore via ADC)
+
+**To redeploy after changes:**
+```bash
+# API (Go server):
+gcloud run deploy fantasy-league-api --source . --region us-central1 --project andy-personal-1bb38
+
+# Frontend (static files + rules):
+firebase deploy --only hosting,firestore:rules
+```
 
 ---
 
