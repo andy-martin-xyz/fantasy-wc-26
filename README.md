@@ -1,4 +1,4 @@
-# WC Fantasy 2026
+# World Cup Fantasy 2026
 
 A real-time fantasy soccer draft app for World Cup 2026, built for a small friend group.
 
