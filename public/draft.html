@@ -113,6 +113,12 @@
                placeholder="Search players…"
                x-model="search"
                style="margin-bottom:8px">
+        <select class="form-input" x-model="nationFilter" style="margin-bottom:8px">
+          <option value="ALL">All nations</option>
+          <template x-for="nation in nations" :key="nation">
+            <option :value="nation" x-text="nation"></option>
+          </template>
+        </select>
         <div class="tabs">
           <template x-for="tab in ['ALL','GK','DEF','MID','FWD']" :key="tab">
             <button class="tab-btn"
@@ -225,8 +231,9 @@
         playersLoading:   true,
 
         // --- Filters ---
-        posFilter: 'ALL',
-        search:    '',
+        posFilter:    'ALL',
+        nationFilter: 'ALL',
+        search:       '',
 
         // --- History (from Firestore picks sub-collection) ---
         history: [],
@@ -453,6 +460,11 @@
           return slots;
         },
 
+        get nations() {
+          return [...new Set(this.allPlayers.map(p => p.country).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+        },
+
         get filteredPlayers() {
           const draftedSet = new Set(this.draftedPlayerIds);
           return this.allPlayers.filter(p => {
@@ -461,6 +473,8 @@
             // Position filter
             const pos = this.playerPos(p);
             if (this.posFilter !== 'ALL' && pos !== this.posFilter) return false;
+            // Nation filter
+            if (this.nationFilter !== 'ALL' && p.country !== this.nationFilter) return false;
             // Search filter
             const q = this.search.toLowerCase();
             if (q && !p.name.toLowerCase().includes(q) && !(p.country || '').toLowerCase().includes(q)) return false;
