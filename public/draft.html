@@ -465,7 +465,9 @@
             const q = this.search.toLowerCase();
             if (q && !p.name.toLowerCase().includes(q) && !(p.country || '').toLowerCase().includes(q)) return false;
             return true;
-          });
+          })
+          // Highest-rated players first.
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0));
         },
 
         // -------------------------------------------------------
