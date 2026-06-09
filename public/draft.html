@@ -158,6 +158,8 @@
                 <span>·</span>
                 <span :class="'badge badge-' + playerPos(player).toLowerCase()"
                       x-text="playerPos(player)"></span>
+                <span x-show="player.clubTeam">·</span>
+                <span x-show="player.clubTeam" x-text="player.clubTeam"></span>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">

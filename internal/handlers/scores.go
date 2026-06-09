@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
-	"strings"
 
 	"cloud.google.com/go/firestore"
-	"github.com/go-chi/chi/v5"
 	"github.com/andrewmartin/fantasy-league/internal/models"
+	"github.com/go-chi/chi/v5"
 )
 
 // UpsertMatch handles PUT /api/admin/match/{matchId}.
@@ -25,11 +25,11 @@ func (h *Handler) UpsertMatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	match.ID = matchID
-	match.HomeTeam = strings.TrimSpace(match.HomeTeam)
-	match.AwayTeam = strings.TrimSpace(match.AwayTeam)
+	match.HomeTeam = models.NormalizeTeamName(match.HomeTeam)
+	match.AwayTeam = models.NormalizeTeamName(match.AwayTeam)
 
 	if match.HomeTeam == "" || match.AwayTeam == "" {
-		writeError(w, http.StatusBadRequest, "homeTeam and awayTeam are required")
+		writeError(w, http.StatusBadRequest, "homeTeam and/or awayTeam not recognised — must be a WC 2026 qualified nation")
 		return
 	}
 
@@ -70,7 +70,7 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 
 	ctx := r.Context()
 
-	// 1. Verify the match exists.
+	// Verify the match exists.
 	var match models.Match
 	found, err := h.DB.GetDoc(ctx, "matches", req.MatchID, &match)
 	if err != nil || !found {
@@ -78,18 +78,33 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 2. Write playerMatchStats for each submitted player (overwrites previous).
-	for _, s := range req.Stats {
+	if err := h.applyMatchStats(ctx, req.MatchID, req.Stats); err != nil {
+		h.Log.Error("process scores", "matchId", req.MatchID, "err", err)
+		writeError(w, http.StatusInternalServerError, "internal error processing scores")
+		return
+	}
+
+	h.Log.Info("scores processed", "matchId", req.MatchID, "statsCount", len(req.Stats))
+	writeJSON(w, http.StatusOK, map[string]any{"matchId": req.MatchID, "processed": len(req.Stats)})
+}
+
+// applyMatchStats writes per-player stats for a match, recomputes player,
+// roster, and leaderboard totals, and marks the match complete. Idempotent:
+// re-running for the same match overwrites previous stats. Shared by manual
+// score entry (ProcessScores) and ESPN auto-fetch (FetchScores).
+func (h *Handler) applyMatchStats(ctx context.Context, matchID string, stats []statSubmission) error {
+	// 1. Write playerMatchStats for each submitted player (overwrites previous).
+	for _, s := range stats {
 		var player models.Player
 		pfound, err := h.DB.GetDoc(ctx, "players", s.PlayerID, &player)
 		if err != nil || !pfound {
-			h.Log.Warn("process scores: player not found, skipping", "playerId", s.PlayerID)
+			h.Log.Warn("apply stats: player not found, skipping", "playerId", s.PlayerID)
 			continue
 		}
 
-		stats := models.PlayerMatchStats{
+		ps := models.PlayerMatchStats{
 			PlayerID:    s.PlayerID,
-			MatchID:     req.MatchID,
+			MatchID:     matchID,
 			Goals:       s.Goals,
 			Assists:     s.Assists,
 			CleanSheet:  s.CleanSheet,
@@ -98,47 +113,32 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 			TeamWin:     s.TeamWin,
 			TeamDraw:    s.TeamDraw,
 		}
-		stats.PointsAwarded = models.CalculatePoints(stats, player.Position)
+		ps.PointsAwarded = models.CalculatePoints(ps, player.Position)
 
-		docID := s.PlayerID + "_" + req.MatchID
-		if err := h.DB.SetDoc(ctx, "playerMatchStats", docID, stats); err != nil {
-			h.Log.Error("process scores: write stats", "docId", docID, "err", err)
-			writeError(w, http.StatusInternalServerError, "internal error writing stats")
-			return
+		docID := s.PlayerID + "_" + matchID
+		if err := h.DB.SetDoc(ctx, "playerMatchStats", docID, ps); err != nil {
+			return fmt.Errorf("write stats %s: %w", docID, err)
 		}
 	}
 
-	// 3. Recalculate totalPoints for every drafted player.
-	//    Sum all pointsAwarded across all their playerMatchStats docs.
-	//    This is idempotent regardless of how many times we reprocess.
+	// 2. Recalculate totalPoints for every drafted player (idempotent).
 	if err := h.recalculateAllPlayerPoints(ctx); err != nil {
-		h.Log.Error("process scores: recalculate player points", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error recalculating player points")
-		return
+		return fmt.Errorf("recalculate player points: %w", err)
 	}
-
-	// 4. Recalculate each roster's totalPoints.
+	// 3. Recalculate each roster's totalPoints.
 	if err := h.recalculateAllRosterPoints(ctx); err != nil {
-		h.Log.Error("process scores: recalculate roster points", "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error recalculating roster points")
-		return
+		return fmt.Errorf("recalculate roster points: %w", err)
 	}
-
-	// 5. Rebuild leaderboard/current.
+	// 4. Rebuild leaderboard/current.
 	if err := h.rebuildLeaderboard(ctx); err != nil {
-		h.Log.Error("process scores: rebuild leaderboard", "err", err)
-		writeError(w, http.StatusInternalServerError, "error rebuilding leaderboard")
-		return
+		return fmt.Errorf("rebuild leaderboard: %w", err)
 	}
-
-	// 6. Mark match as scored.
-	_ = h.DB.UpdateDoc(ctx, "matches", req.MatchID, []firestore.Update{
+	// 5. Mark match as scored.
+	_ = h.DB.UpdateDoc(ctx, "matches", matchID, []firestore.Update{
 		{Path: "scoringProcessed", Value: true},
 		{Path: "status", Value: "complete"},
 	})
-
-	h.Log.Info("scores processed", "matchId", req.MatchID, "statsCount", len(req.Stats))
-	writeJSON(w, http.StatusOK, map[string]any{"matchId": req.MatchID, "processed": len(req.Stats)})
+	return nil
 }
 
 // recalculateAllPlayerPoints sums each drafted player's match stats and updates totalPoints.

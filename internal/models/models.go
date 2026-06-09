@@ -17,16 +17,17 @@ type User struct {
 // --- Player -----------------------------------------------------
 
 type Player struct {
-	ID          string `firestore:"id"          json:"id"`
-	Name        string `firestore:"name"        json:"name"`
-	Country     string `firestore:"country"     json:"country"`
-	Position    string `firestore:"position"    json:"position"` // GK DEF MID FWD
-	ClubTeam    string `firestore:"clubTeam"    json:"clubTeam"`
-	Rating      int    `firestore:"rating"      json:"rating"`
-	ImageURL    string `firestore:"imageURL"    json:"imageURL"`
-	Drafted     bool   `firestore:"drafted"     json:"drafted"`
-	DraftedBy   string `firestore:"draftedBy"   json:"draftedBy"`
-	TotalPoints int    `firestore:"totalPoints" json:"totalPoints"`
+	ID            string `firestore:"id"          json:"id"`
+	Name          string `firestore:"name"        json:"name"`
+	Country       string `firestore:"country"     json:"country"`
+	Position      string `firestore:"position"    json:"position"` // GK DEF MID FWD
+	ClubTeam      string `firestore:"clubTeam"    json:"clubTeam"`
+	Rating        int    `firestore:"rating"      json:"rating"`
+	ImageURL      string `firestore:"imageURL"    json:"imageURL"`
+	Drafted       bool   `firestore:"drafted"     json:"drafted"`
+	DraftedBy     string `firestore:"draftedBy"   json:"draftedBy"`
+	TotalPoints   int    `firestore:"totalPoints" json:"totalPoints"`
+	ESPNAthleteID string `firestore:"espnAthleteId" json:"espnAthleteId"` // for exact match-stat lookup
 }
 
 // Valid positions.
@@ -107,6 +108,7 @@ type Match struct {
 	Date             time.Time `firestore:"date"             json:"date"`
 	Status           string    `firestore:"status"           json:"status"` // upcoming live complete
 	ScoringProcessed bool      `firestore:"scoringProcessed" json:"scoringProcessed"`
+	ESPNEventID      string    `firestore:"espnEventId"      json:"espnEventId"` // ESPN fixture id for auto score fetch
 }
 
 type PlayerMatchStats struct {

@@ -7,6 +7,12 @@ import (
 	"github.com/andrewmartin/fantasy-league/internal/models"
 )
 
+// GetTeams handles GET /api/teams — public, no auth.
+// Returns all WC 2026 qualified nations with flag and confederation.
+func (h *Handler) GetTeams(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, http.StatusOK, models.WC2026Teams)
+}
+
 // GetLeaderboard handles GET /api/leaderboard — public, no auth.
 // Before any scores are processed, falls back to all registered users with 0 pts
 // so the standings page shows who has signed up even before the draft.

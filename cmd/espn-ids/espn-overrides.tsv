@@ -1,0 +1,10 @@
+# Manual ESPN athlete-id overrides for notable players the name-matcher misses
+# (ESPN spelling variants / ambiguous surnames). Format: Country<TAB>Name<TAB>espnId
+# Wins over automatic matching. Verified against ESPN national-team rosters.
+Jordan	Musa Al-Taamari	257489
+Uruguay	Maximiliano Araújo	287025
+Brazil	Ederson Moraes	176948
+Brazil	Éderson Silva	278210
+Ghana	Abdul Fatawu	318680
+Egypt	Mohamed Abdelmonem	236957
+Saudi Arabia	Firas Al-Buraikan	283331

@@ -66,6 +66,7 @@ func main() {
 		w.Write([]byte(`{"status":"ok"}`))
 	})
 	r.Get("/api/leaderboard", h.GetLeaderboard)
+	r.Get("/api/teams", h.GetTeams)
 	r.Get("/api/team/{uid}", h.GetTeam)
 	r.Get("/api/draft/status", h.GetDraftStatus)
 	r.Get("/api/players", h.GetPlayers)
@@ -93,6 +94,7 @@ func main() {
 		r.Post("/api/admin/players/import", h.ImportPlayers)
 		r.Put("/api/admin/match/{matchId}", h.UpsertMatch)
 		r.Post("/api/admin/scores/process", h.ProcessScores)
+		r.Post("/api/admin/scores/fetch/{matchId}", h.FetchScores)
 	})
 
 	// --- Server ------------------------------------------------------
