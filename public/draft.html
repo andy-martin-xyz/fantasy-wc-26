@@ -82,6 +82,34 @@
         </div>
       </div>
 
+      <!-- Draft history -->
+      <div style="margin-bottom:16px">
+        <div class="section-label" style="margin-bottom:8px">Draft History</div>
+        <template x-if="history.length === 0">
+          <div class="card" style="padding:16px;color:var(--color-text-muted);font-size:var(--text-sm);text-align:center">
+            No picks yet — draft hasn't started
+          </div>
+        </template>
+        <div class="card" x-show="history.length > 0"
+             style="padding:0;overflow:hidden;max-height:320px;overflow-y:auto"
+             x-ref="historyList">
+          <template x-for="entry in history" :key="entry.pick">
+            <div class="pick-log-item">
+              <div class="pick-number" x-text="entry.pick"></div>
+              <div class="pick-detail">
+                <div class="pick-player-name" x-text="entry.player"></div>
+                <div class="pick-owner">
+                  <span :class="'badge badge-' + entry.pos.toLowerCase()" x-text="entry.pos"></span>
+                  &nbsp;→&nbsp;
+                  <span x-text="entry.name"></span>
+                  <span style="color:var(--color-text-dim)"> · R<span x-text="entry.round"></span></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- AI Suggestions (only visible on your turn) -->
       <div class="card" style="margin-bottom:16px" x-show="isMyTurn">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -174,34 +202,6 @@
             </div>
           </div>
         </template>
-      </div>
-
-      <!-- Draft history -->
-      <div style="margin-top:24px">
-        <div class="section-label">Draft History</div>
-        <template x-if="history.length === 0">
-          <div class="card" style="padding:16px;color:var(--color-text-muted);font-size:var(--text-sm);text-align:center">
-            No picks yet — draft hasn't started
-          </div>
-        </template>
-        <div class="card" x-show="history.length > 0"
-             style="padding:0;overflow:hidden;max-height:320px;overflow-y:auto"
-             x-ref="historyList">
-          <template x-for="entry in history" :key="entry.pick">
-            <div class="pick-log-item">
-              <div class="pick-number" x-text="entry.pick"></div>
-              <div class="pick-detail">
-                <div class="pick-player-name" x-text="entry.player"></div>
-                <div class="pick-owner">
-                  <span :class="'badge badge-' + entry.pos.toLowerCase()" x-text="entry.pos"></span>
-                  &nbsp;→&nbsp;
-                  <span x-text="entry.name"></span>
-                  <span style="color:var(--color-text-dim)"> · R<span x-text="entry.round"></span></span>
-                </div>
-              </div>
-            </div>
-          </template>
-        </div>
       </div>
 
       <!-- Toast -->
