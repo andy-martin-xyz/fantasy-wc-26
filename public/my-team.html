@@ -27,6 +27,7 @@
         <a href="login.html" class="nav-link" x-show="!$store.auth.authLoading && !$store.auth.isLoggedIn" x-cloak>Sign In</a>
         <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
           <a href="draft.html" class="nav-link">Draft</a>
+          <a href="teams.html" class="nav-link">Teams</a>
           <a href="my-team.html" class="nav-link active">My Team</a>
           <a href="admin.html" class="nav-link" x-show="$store.auth.isAdmin">Admin</a>
           <div class="nav-avatar"
