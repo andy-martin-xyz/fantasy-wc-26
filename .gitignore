@@ -75,6 +75,7 @@ node_modules/
 /apifootball-ids
 /espn-ids
 /sofifa-test
+/fixtures
 *.exe
 
 # Root config.js — contains Firebase API key (runtime-generated; see public/js/config.js.example)
