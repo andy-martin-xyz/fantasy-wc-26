@@ -163,7 +163,8 @@
       </div>
 
       <!-- Player list -->
-      <div>
+      <div x-ref="playerList" @scroll="loadMoreOnScroll($event)"
+           style="max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
         <template x-if="playersLoading">
           <div class="empty-state" style="padding:32px 16px">
             <div class="spinner"></div>
@@ -177,7 +178,7 @@
           </div>
         </template>
 
-        <template x-for="player in filteredPlayers" :key="player.id">
+        <template x-for="player in visiblePlayers" :key="player.id">
           <div class="draft-player-card">
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:var(--text-sm)" x-text="player.name"></div>
@@ -202,6 +203,12 @@
             </div>
           </div>
         </template>
+
+        <!-- Lazy-load hint: shown while more players remain below the fold. -->
+        <div x-show="!playersLoading && visiblePlayers.length < filteredPlayers.length"
+             style="text-align:center;padding:10px;color:var(--color-text-muted);font-size:var(--text-xs)">
+          Scroll for more…
+        </div>
       </div>
 
       <!-- Toast -->
@@ -236,6 +243,10 @@
         posFilter:    'ALL',
         nationFilter: 'ALL',
         search:       '',
+
+        // --- Lazy rendering (only render renderLimit cards; grow on scroll) ---
+        renderLimit: 40,
+        renderStep:  40,
 
         // --- History (from Firestore picks sub-collection) ---
         history: [],
@@ -273,6 +284,14 @@
 
           this.$watch('$store.auth.authLoading', v => { if (!v) this.loadAll(); });
           if (!Alpine.store('auth').authLoading) this.loadAll();
+
+          // Reset the lazy-render window whenever a filter changes, and scroll
+          // the list back to the top.
+          ['search', 'posFilter', 'nationFilter'].forEach(f =>
+            this.$watch(f, () => {
+              this.renderLimit = this.renderStep;
+              if (this.$refs.playerList) this.$refs.playerList.scrollTop = 0;
+            }));
         },
 
         destroy() {
@@ -484,6 +503,20 @@
           })
           // Highest-rated players first.
           .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        },
+
+        // Only the first renderLimit players are rendered; grows on scroll.
+        get visiblePlayers() {
+          return this.filteredPlayers.slice(0, this.renderLimit);
+        },
+
+        // Grow the render window as the user nears the bottom of the list.
+        loadMoreOnScroll(e) {
+          const el = e.target;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240 &&
+              this.renderLimit < this.filteredPlayers.length) {
+            this.renderLimit += this.renderStep;
+          }
         },
 
         // -------------------------------------------------------
