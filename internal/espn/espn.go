@@ -60,6 +60,59 @@ func FetchTeams(ctx context.Context) ([]TeamInfo, error) {
 	return out, nil
 }
 
+// Fixture is one scheduled match from the scoreboard.
+type Fixture struct {
+	EventID  string
+	Date     time.Time
+	HomeTeam string // ESPN display name
+	AwayTeam string // ESPN display name
+	State    string // pre / in / post
+}
+
+// FetchFixtures returns World Cup fixtures for an ESPN `dates` value, which may
+// be a single day (YYYYMMDD) or a range (YYYYMMDD-YYYYMMDD).
+func FetchFixtures(ctx context.Context, dates string) ([]Fixture, error) {
+	var body struct {
+		Events []struct {
+			ID           string `json:"id"`
+			Date         string `json:"date"`
+			Competitions []struct {
+				Status struct {
+					Type struct {
+						State string `json:"state"`
+					} `json:"type"`
+				} `json:"status"`
+				Competitors []struct {
+					HomeAway string `json:"homeAway"`
+					Team     struct {
+						DisplayName string `json:"displayName"`
+					} `json:"team"`
+				} `json:"competitors"`
+			} `json:"competitions"`
+		} `json:"events"`
+	}
+	if err := getJSON(ctx, baseURL+"/scoreboard?limit=400&dates="+dates, &body); err != nil {
+		return nil, err
+	}
+	var out []Fixture
+	for _, e := range body.Events {
+		if len(e.Competitions) == 0 {
+			continue
+		}
+		c := e.Competitions[0]
+		f := Fixture{EventID: e.ID, State: c.Status.Type.State, Date: parseESPNTime(e.Date)}
+		for _, comp := range c.Competitors {
+			if comp.HomeAway == "home" {
+				f.HomeTeam = comp.Team.DisplayName
+			} else {
+				f.AwayTeam = comp.Team.DisplayName
+			}
+		}
+		out = append(out, f)
+	}
+	return out, nil
+}
+
 // FetchRoster returns a national team's current squad (athlete id + name + position).
 func FetchRoster(ctx context.Context, teamID string) ([]RosterAthlete, error) {
 	var body struct {
@@ -273,6 +326,17 @@ func FetchSummary(ctx context.Context, eventID string) (*Summary, error) {
 	}
 
 	return s, nil
+}
+
+// parseESPNTime handles ESPN's timestamps, which omit seconds
+// (e.g. "2026-06-11T19:00Z") and so don't match time.RFC3339.
+func parseESPNTime(s string) time.Time {
+	for _, layout := range []string{"2006-01-02T15:04Z07:00", time.RFC3339} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t
+		}
+	}
+	return time.Time{}
 }
 
 func mapPosition(abbr string) string {

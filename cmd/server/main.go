@@ -93,6 +93,8 @@ func main() {
 		r.Post("/api/admin/draft/reset", h.ResetDraft)
 		r.Post("/api/admin/players/import", h.ImportPlayers)
 		r.Put("/api/admin/match/{matchId}", h.UpsertMatch)
+		r.Get("/api/admin/matches", h.GetMatches)
+		r.Post("/api/admin/fixtures/import", h.ImportFixtures)
 		r.Post("/api/admin/scores/process", h.ProcessScores)
 		r.Post("/api/admin/scores/fetch/{matchId}", h.FetchScores)
 	})
