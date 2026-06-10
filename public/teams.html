@@ -73,9 +73,12 @@
                    x-show="team.displayName && team.displayName !== team.name"
                    x-text="team.displayName"></div>
             </div>
-            <div style="font-size:var(--text-sm);font-weight:700"
-                 :style="team.count === 11 ? 'color:var(--color-primary)' : ''"
-                 x-text="team.count + '/11'"></div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-weight:800;font-size:var(--text-lg);line-height:1" x-text="team.points"></div>
+              <div style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px"
+                   :style="team.count === 11 ? 'color:var(--color-primary)' : ''"
+                   x-text="'pts · ' + team.count + '/11'"></div>
+            </div>
           </div>
 
           <!-- Roster grouped by position -->
@@ -197,13 +200,15 @@
           // Include users who have picks but somehow aren't in either list.
           Object.keys(byUser).forEach(uid => { if (!seen.has(uid)) { ordered.push(uid); seen.add(uid); } });
 
-          return ordered.map(uid => {
+          const built = ordered.map(uid => {
             const u = this.users[uid] || {};
             const name = u.teamName || u.displayName || 'Player';
             const myPicks = byUser[uid] || [];
 
+            let points = 0;
             const players = myPicks.map(pk => {
               const p = this.allPlayersById[pk.playerId] || {};
+              points += p.totalPoints || 0;
               return {
                 playerId: pk.playerId,
                 short:    (pk.playerName || p.name || '').split(' ').pop(),
@@ -220,6 +225,7 @@
               colorIdx:    u.colorIdx ?? 0,
               initials:    this.initials(name),
               count:       players.length,
+              points,
               groups: [
                 { pos: 'GK',  names: group('GK')  },
                 { pos: 'DEF', names: group('DEF') },
@@ -228,6 +234,13 @@
               ],
             };
           });
+
+          // Once any scores are in, rank the board by points; before that,
+          // keep the draft order.
+          if (built.some(t => t.points > 0)) {
+            built.sort((a, b) => b.points - a.points);
+          }
+          return built;
         },
 
         initials(name) {
