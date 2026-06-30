@@ -23,7 +23,10 @@
       "Bash(git commit -m \"Initial commit with draft test fixes and project structure\")",
       "Bash(./scripts/seed-prod.sh:*)",
       "Bash(docker compose:*)",
-      "Bash(brew list:*)"
+      "Bash(brew list:*)",
+      "Bash(git checkout *)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
     ]
   }
 }
