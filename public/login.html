@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Sign In — WC Fantasy 2026</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=3">
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script defer src="js/config.js"></script>
@@ -13,19 +13,27 @@
   <script defer src="js/api.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <div class="app-wrapper">
 
-    <!-- Minimal nav -->
+    <!-- Nav -->
     <nav class="nav">
       <a href="index.html" class="nav-brand">
         <span class="brand-icon">⚽</span>
         <span class="brand-text">WC <span>Fantasy</span></span>
       </a>
-      <div class="nav-actions">
-        <a href="index.html" class="nav-link">Standings</a>
+      <div style="display:flex;align-items:center;gap:8px">
+        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
+          <span x-text="navOpen ? '✕' : '☰'"></span>
+        </button>
       </div>
     </nav>
+    <div x-show="navOpen" x-cloak @click="navOpen = false"
+         style="position:fixed;inset:0;z-index:150"></div>
+    <div class="nav-drawer" x-show="navOpen" x-cloak>
+      <a href="index.html" class="nav-drawer-link">Standings</a>
+      <a href="login.html" class="nav-drawer-link active">Sign In</a>
+    </div>
 
     <!-- Login card -->
     <main class="page-content"
