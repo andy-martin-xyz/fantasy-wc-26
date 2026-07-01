@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Standings — WC Fantasy 2026</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=3">
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script defer src="js/config.js"></script>
@@ -13,7 +13,7 @@
   <script defer src="js/api.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <div class="app-wrapper">
 
     <!-- Nav -->
@@ -22,20 +22,29 @@
         <span class="brand-icon">⚽</span>
         <span class="brand-text">WC <span>Fantasy</span></span>
       </a>
-      <div class="nav-actions" x-data>
-        <div class="spinner" x-show="$store.auth.authLoading"></div>
-        <a href="login.html" class="nav-link" x-show="!$store.auth.authLoading && !$store.auth.isLoggedIn" x-cloak>Sign In</a>
-        <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
-          <a href="draft.html" class="nav-link">Draft</a>
-          <a href="teams.html" class="nav-link">Teams</a>
-          <a href="my-team.html" class="nav-link">My Team</a>
-          <a href="admin.html" class="nav-link" x-show="$store.auth.isAdmin">Admin</a>
-          <div class="nav-avatar"
-               :class="'avatar-' + $store.auth.user?.colorIdx"
-               x-text="$store.auth.user?.initials"></div>
-        </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="spinner" x-show="$store.auth.authLoading" x-cloak></div>
+        <div class="nav-avatar" x-cloak
+             x-show="!$store.auth.authLoading && $store.auth.isLoggedIn"
+             :class="'avatar-' + $store.auth.user?.colorIdx"
+             x-text="$store.auth.user?.initials"></div>
+        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
+          <span x-text="navOpen ? '✕' : '☰'"></span>
+        </button>
       </div>
     </nav>
+    <div x-show="navOpen" x-cloak @click="navOpen = false"
+         style="position:fixed;inset:0;z-index:150"></div>
+    <div class="nav-drawer" x-show="navOpen" x-cloak>
+      <a href="index.html" class="nav-drawer-link active">Standings</a>
+      <a href="draft.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Draft</a>
+      <a href="teams.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Teams</a>
+      <a href="my-team.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">My Team</a>
+      <a href="admin.html" class="nav-drawer-link" x-show="$store.auth.isAdmin">Admin</a>
+      <div class="nav-drawer-divider"></div>
+      <a href="login.html" class="nav-drawer-link" x-show="!$store.auth.isLoggedIn && !$store.auth.authLoading">Sign In</a>
+      <button class="nav-drawer-link nav-drawer-signout" x-show="$store.auth.isLoggedIn" @click="signOutUser()">Sign Out</button>
+    </div>
 
     <!-- Leaderboard -->
     <main class="page-content" x-data="leaderboardPage()" x-init="load()">
