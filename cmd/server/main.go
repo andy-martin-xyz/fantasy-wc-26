@@ -54,25 +54,37 @@ func main() {
 	h := handlers.New(dbClient, authClient, log)
 
 	r := chi.NewRouter()
+	// Global middleware must all be registered before any routes in chi.
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.Recoverer)
 	r.Use(corsMiddleware(os.Getenv("ALLOWED_ORIGIN"), log))
-	r.Use(chimiddleware.Timeout(30 * time.Second))
+
+	// Cron route: no 30s timeout — backfill may process dozens of matches.
+	// Protected by CRON_SECRET; Cloud Scheduler sends it as X-Cron-Secret.
+	r.Group(func(r chi.Router) {
+		r.Use(cronAuthMiddleware(os.Getenv("CRON_SECRET")))
+		r.Post("/api/cron/scores/poll", h.AutoScore)
+	})
 
 	// Public routes
-	r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"status":"ok"}`))
+	r.Group(func(r chi.Router) {
+		r.Use(chimiddleware.Timeout(30 * time.Second))
+		r.Get("/api/health", func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"status":"ok"}`))
+		})
+		r.Get("/api/leaderboard", h.GetLeaderboard)
+		r.Get("/api/teams", h.GetTeams)
+		r.Get("/api/team/{uid}", h.GetTeam)
+		r.Get("/api/draft/status", h.GetDraftStatus)
+		r.Get("/api/players", h.GetPlayers)
+		r.Get("/api/users", h.GetUsers)
 	})
-	r.Get("/api/leaderboard", h.GetLeaderboard)
-	r.Get("/api/team/{uid}", h.GetTeam)
-	r.Get("/api/draft/status", h.GetDraftStatus)
-	r.Get("/api/players", h.GetPlayers)
-	r.Get("/api/users", h.GetUsers)
 
 	// Authenticated routes
 	r.Group(func(r chi.Router) {
+		r.Use(chimiddleware.Timeout(30 * time.Second))
 		r.Use(middleware.Authenticate(authClient))
 		r.Post("/api/user/register", h.RegisterUser)
 		r.Put("/api/user/team-name", h.UpdateTeamName)
@@ -82,6 +94,7 @@ func main() {
 
 	// Admin routes
 	r.Group(func(r chi.Router) {
+		r.Use(chimiddleware.Timeout(30 * time.Second))
 		r.Use(middleware.Authenticate(authClient))
 		r.Use(middleware.RequireAdmin(dbClient))
 		r.Post("/api/admin/draft/set-order", h.SetDraftOrder)
@@ -92,7 +105,10 @@ func main() {
 		r.Post("/api/admin/draft/reset", h.ResetDraft)
 		r.Post("/api/admin/players/import", h.ImportPlayers)
 		r.Put("/api/admin/match/{matchId}", h.UpsertMatch)
+		r.Get("/api/admin/matches", h.GetMatches)
+		r.Post("/api/admin/fixtures/import", h.ImportFixtures)
 		r.Post("/api/admin/scores/process", h.ProcessScores)
+		r.Post("/api/admin/scores/fetch/{matchId}", h.FetchScores)
 	})
 
 	// --- Server ------------------------------------------------------
@@ -107,12 +123,31 @@ func main() {
 		Addr:         addr,
 		Handler:      r,
 		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 6 * time.Minute, // cron auto-score may take several minutes for backfill
 		IdleTimeout:  60 * time.Second,
 	}
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		log.Error("server error", "err", err)
 		os.Exit(1)
+	}
+}
+
+// cronAuthMiddleware rejects requests that don't carry CRON_SECRET in the
+// X-Cron-Secret header (set by Cloud Scheduler). If the env var is unset the
+// endpoint is disabled entirely.
+func cronAuthMiddleware(secret string) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if secret == "" {
+				http.Error(w, `{"error":"cron endpoint disabled — set CRON_SECRET"}`, http.StatusForbidden)
+				return
+			}
+			if r.Header.Get("X-Cron-Secret") != secret {
+				http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+				return
+			}
+			next.ServeHTTP(w, r)
+		})
 	}
 }
 

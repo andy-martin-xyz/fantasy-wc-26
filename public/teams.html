@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Teams — WC Fantasy 2026</title>
+  <link rel="stylesheet" href="css/styles.css?v=3">
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+  <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+  <script defer src="js/config.js"></script>
+  <script defer src="js/app.js"></script>
+  <script defer src="js/auth.js"></script>
+  <script defer src="js/api.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
+</head>
+<body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
+  <div class="app-wrapper">
+
+    <!-- Nav -->
+    <nav class="nav">
+      <a href="index.html" class="nav-brand">
+        <span class="brand-icon">⚽</span>
+        <span class="brand-text">WC <span>Fantasy</span></span>
+      </a>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="spinner" x-show="$store.auth.authLoading" x-cloak></div>
+        <div class="nav-avatar" x-cloak
+             x-show="!$store.auth.authLoading && $store.auth.isLoggedIn"
+             :class="'avatar-' + $store.auth.user?.colorIdx"
+             x-text="$store.auth.user?.initials"></div>
+        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
+          <span x-text="navOpen ? '✕' : '☰'"></span>
+        </button>
+      </div>
+    </nav>
+    <div x-show="navOpen" x-cloak @click="navOpen = false"
+         style="position:fixed;inset:0;z-index:150"></div>
+    <div class="nav-drawer" x-show="navOpen" x-cloak>
+      <a href="index.html" class="nav-drawer-link">Standings</a>
+      <a href="draft.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Draft</a>
+      <a href="teams.html" class="nav-drawer-link active" x-show="$store.auth.isLoggedIn">Teams</a>
+      <a href="my-team.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">My Team</a>
+      <a href="admin.html" class="nav-drawer-link" x-show="$store.auth.isAdmin">Admin</a>
+      <div class="nav-drawer-divider"></div>
+      <a href="login.html" class="nav-drawer-link" x-show="!$store.auth.isLoggedIn && !$store.auth.authLoading">Sign In</a>
+      <button class="nav-drawer-link nav-drawer-signout" x-show="$store.auth.isLoggedIn" @click="signOutUser()">Sign Out</button>
+    </div>
+
+    <!-- Teams board -->
+    <main class="page-content" x-data="teamsPage()">
+
+      <div class="section-label" style="margin-bottom:12px">
+        All Teams<span x-show="!loading"> (<span x-text="teams.length"></span>)</span>
+      </div>
+
+      <!-- Loading -->
+      <template x-if="loading">
+        <div class="empty-state" style="padding:48px 16px">
+          <div class="spinner"></div>
+        </div>
+      </template>
+
+      <!-- No participants yet -->
+      <template x-if="!loading && teams.length === 0">
+        <div class="empty-state" style="padding:48px 16px">
+          <div class="empty-state-icon" style="font-size:32px">👥</div>
+          <div class="empty-state-text">No participants yet</div>
+        </div>
+      </template>
+
+      <!-- One card per participant -->
+      <template x-for="team in teams" :key="team.uid">
+        <div class="card" style="margin-bottom:12px">
+
+          <!-- Header: avatar · name · pick count -->
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div class="avatar avatar-sm" :class="'avatar-' + team.colorIdx" x-text="team.initials"></div>
+            <div style="flex:1;min-width:0">
+              <div style="font-weight:700;font-size:var(--text-sm)" x-text="team.name"></div>
+              <div style="font-size:var(--text-xs);color:var(--color-text-muted)"
+                   x-show="team.displayName && team.displayName !== team.name"
+                   x-text="team.displayName"></div>
+            </div>
+            <div style="text-align:right;flex-shrink:0">
+              <div style="font-weight:800;font-size:var(--text-lg);line-height:1" x-text="team.points"></div>
+              <div style="font-size:var(--text-xs);color:var(--color-text-muted);margin-top:2px"
+                   :style="team.count === 11 ? 'color:var(--color-primary)' : ''"
+                   x-text="'pts · ' + team.count + '/11'"></div>
+            </div>
+          </div>
+
+          <!-- Roster grouped by position -->
+          <template x-for="g in team.groups" :key="g.pos">
+            <div style="display:flex;gap:8px;align-items:baseline;padding:3px 0">
+              <span class="badge" :class="'badge-' + g.pos.toLowerCase()"
+                    style="flex-shrink:0;min-width:36px;text-align:center" x-text="g.pos"></span>
+              <div style="flex:1;font-size:var(--text-sm);line-height:1.5"
+                   :style="g.names.length ? '' : 'color:var(--color-text-dim)'"
+                   x-text="g.names.length ? g.names.join(', ') : '—'"></div>
+            </div>
+          </template>
+
+          <!-- Link to full team page -->
+          <a :href="'team.html?id=' + team.uid" class="nav-link"
+             style="display:inline-block;margin-top:8px;font-size:var(--text-xs)">View full team →</a>
+        </div>
+      </template>
+
+    </main>
+  </div>
+
+  <script>
+    function teamsPage() {
+      return {
+        loading:        true,
+        users:          {},   // uid -> { displayName, teamName, colorIdx }
+        allPlayersById: {},   // playerId -> player (for position/country lookup)
+        picks:          [],   // [{ userId, playerId, playerName, round, pick }]
+        pickOrder:      [],   // UIDs in draft order (for stable card ordering)
+
+        _picksUnsub:  null,
+        _configUnsub: null,
+
+        async init() {
+          if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+            try { firebase.firestore().useEmulator('127.0.0.1', 8080); } catch {}
+          }
+          this.$watch('$store.auth.authLoading', v => { if (!v) this.loadAll(); });
+          if (!Alpine.store('auth').authLoading) this.loadAll();
+        },
+
+        destroy() {
+          if (this._picksUnsub)  this._picksUnsub();
+          if (this._configUnsub) this._configUnsub();
+        },
+
+        async loadAll() {
+          await Promise.all([this.loadUsers(), this.loadPlayers()]);
+          this.startListeners();
+          this.loading = false;
+        },
+
+        async loadUsers() {
+          try {
+            const res = await Api.getUsers();
+            const map = {};
+            (res.users || []).forEach((u, idx) => {
+              map[u.uid] = {
+                displayName: u.displayName || u.teamName || ('Player ' + (idx + 1)),
+                teamName:    u.teamName,
+                colorIdx:    idx % 8,
+              };
+            });
+            this.users = map;
+          } catch (e) {
+            console.warn('[teams] loadUsers failed:', e);
+          }
+        },
+
+        async loadPlayers() {
+          try {
+            const all = await Api.getPlayers();
+            const byId = {};
+            all.forEach(p => { byId[p.id] = p; });
+            this.allPlayersById = byId;
+          } catch (e) {
+            console.warn('[teams] loadPlayers failed:', e);
+          }
+        },
+
+        startListeners() {
+          const db = firebase.firestore();
+
+          this._configUnsub = db.collection('draft').doc('config')
+            .onSnapshot(snap => {
+              if (snap.exists) this.pickOrder = snap.data().pickOrder || [];
+            }, err => console.error('[teams] config listener:', err));
+
+          this._picksUnsub = db.collection('draft').doc('picks').collection('items')
+            .orderBy('pickNumber')
+            .onSnapshot(snap => {
+              const picks = [];
+              snap.forEach(doc => {
+                const p = doc.data();
+                picks.push({
+                  userId:     p.userId,
+                  playerId:   p.playerId,
+                  playerName: p.playerName,
+                  round:      p.round,
+                  pick:       p.pickNumber,
+                });
+              });
+              this.picks = picks;
+            }, err => console.error('[teams] picks listener:', err));
+        },
+
+        // Build one team object per participant, rosters grouped by position.
+        get teams() {
+          // Group picks by user.
+          const byUser = {};
+          this.picks.forEach(pk => { (byUser[pk.userId] ||= []).push(pk); });
+
+          // Order: draft order first, then any remaining registered users.
+          const ordered = [];
+          const seen = new Set();
+          this.pickOrder.forEach(uid => { if (!seen.has(uid)) { ordered.push(uid); seen.add(uid); } });
+          Object.keys(this.users).forEach(uid => { if (!seen.has(uid)) { ordered.push(uid); seen.add(uid); } });
+          // Include users who have picks but somehow aren't in either list.
+          Object.keys(byUser).forEach(uid => { if (!seen.has(uid)) { ordered.push(uid); seen.add(uid); } });
+
+          const built = ordered.map(uid => {
+            const u = this.users[uid] || {};
+            const name = u.teamName || u.displayName || 'Player';
+            const myPicks = byUser[uid] || [];
+
+            let points = 0;
+            const players = myPicks.map(pk => {
+              const p = this.allPlayersById[pk.playerId] || {};
+              points += p.totalPoints || 0;
+              return {
+                playerId: pk.playerId,
+                short:    (pk.playerName || p.name || '').split(' ').pop(),
+                pos:      p.position || p.pos || '?',
+              };
+            });
+
+            const group = pos => players.filter(p => p.pos === pos).map(p => p.short);
+
+            return {
+              uid,
+              name,
+              displayName: u.displayName || '',
+              colorIdx:    u.colorIdx ?? 0,
+              initials:    this.initials(name),
+              count:       players.length,
+              points,
+              groups: [
+                { pos: 'GK',  names: group('GK')  },
+                { pos: 'DEF', names: group('DEF') },
+                { pos: 'MID', names: group('MID') },
+                { pos: 'FWD', names: group('FWD') },
+              ],
+            };
+          });
+
+          // Once any scores are in, rank the board by points; before that,
+          // keep the draft order.
+          if (built.some(t => t.points > 0)) {
+            built.sort((a, b) => b.points - a.points);
+          }
+          return built;
+        },
+
+        initials(name) {
+          if (!name) return '?';
+          return name.trim().split(/\s+/).map(n => n[0]).join('').slice(0, 2).toUpperCase();
+        },
+      };
+    }
+  </script>
+</body>
+</html>

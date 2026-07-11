@@ -68,10 +68,21 @@ node_modules/
 # dataconnect generated files
 .dataconnect
 
-# Go compiled binaries
+# Go compiled binaries (stray dev builds from `go build ./cmd/X`)
 /server
 /seed
+/import
+/apifootball-ids
+/espn-ids
+/sofifa-test
+/fixtures
 *.exe
+
+# Root config.js — contains Firebase API key (runtime-generated; see public/js/config.js.example)
+/js/config.js
+
+# API-Football local response cache
+cmd/apifootball-ids/cache/
 
 # Claude Code local settings
 .claude/

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Admin — WC Fantasy 2026</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=3">
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script defer src="js/config.js"></script>
@@ -13,7 +13,7 @@
   <script defer src="js/api.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <div class="app-wrapper">
 
     <!-- Nav -->
@@ -22,18 +22,29 @@
         <span class="brand-icon">⚽</span>
         <span class="brand-text">WC <span>Fantasy</span></span>
       </a>
-      <div class="nav-actions" x-data>
-        <div class="spinner" x-show="$store.auth.authLoading"></div>
-        <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
-          <a href="draft.html" class="nav-link">Draft</a>
-          <a href="my-team.html" class="nav-link">My Team</a>
-          <a href="admin.html" class="nav-link active">Admin</a>
-          <div class="nav-avatar"
-               :class="'avatar-' + $store.auth.user?.colorIdx"
-               x-text="$store.auth.user?.initials"></div>
-        </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="spinner" x-show="$store.auth.authLoading" x-cloak></div>
+        <div class="nav-avatar" x-cloak
+             x-show="!$store.auth.authLoading && $store.auth.isLoggedIn"
+             :class="'avatar-' + $store.auth.user?.colorIdx"
+             x-text="$store.auth.user?.initials"></div>
+        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
+          <span x-text="navOpen ? '✕' : '☰'"></span>
+        </button>
       </div>
     </nav>
+    <div x-show="navOpen" x-cloak @click="navOpen = false"
+         style="position:fixed;inset:0;z-index:150"></div>
+    <div class="nav-drawer" x-show="navOpen" x-cloak>
+      <a href="index.html" class="nav-drawer-link">Standings</a>
+      <a href="draft.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Draft</a>
+      <a href="teams.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Teams</a>
+      <a href="my-team.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">My Team</a>
+      <a href="admin.html" class="nav-drawer-link active" x-show="$store.auth.isAdmin">Admin</a>
+      <div class="nav-drawer-divider"></div>
+      <a href="login.html" class="nav-drawer-link" x-show="!$store.auth.isLoggedIn && !$store.auth.authLoading">Sign In</a>
+      <button class="nav-drawer-link nav-drawer-signout" x-show="$store.auth.isLoggedIn" @click="signOutUser()">Sign Out</button>
+    </div>
 
     <main class="page-content" x-data="adminPage()"
           x-init="$watch('$store.auth.authLoading', v => { if (!v) checkAccess(); }); $watch('$store.auth.isAdmin', v => { if (v) loadDraftStatus(); }); if (!$store.auth.authLoading) checkAccess();">
@@ -212,26 +223,91 @@
 
         <div class="divider"></div>
 
-        <!-- Process Scores -->
+        <!-- Fixtures -->
         <div class="admin-section">
-          <div class="admin-section-title">⚡ Process Scores</div>
+          <div class="admin-section-title">📅 Fixtures</div>
           <p style="color:var(--color-text-muted);font-size:var(--text-sm);margin-bottom:12px">
-            Paste a JSON array of player stats for a match. Points are calculated and leaderboard is updated.
+            Import the World Cup schedule from ESPN (each match gets its ESPN id for auto-scoring), then tap one to score.
           </p>
-          <div class="form-group">
-            <label class="form-label">Match ID</label>
-            <input class="form-input" type="text" placeholder="fra-arg-group-a" x-model="scores.matchId">
-          </div>
-          <div class="form-group">
-            <label class="form-label">Player Stats (JSON)</label>
-            <textarea class="form-textarea"
-                      style="min-height:160px;font-family:var(--font-mono);font-size:var(--text-xs)"
-                      placeholder='[{"playerId":"kylian-mbappe_france","goals":2,"assists":0,"cleanSheet":false,"yellowCards":0,"redCards":0,"teamWin":true,"teamDraw":false}]'
-                      x-model="scores.statsJson"></textarea>
-          </div>
           <div class="admin-controls">
-            <button class="btn btn-primary" :disabled="busy" @click="processScores()">⚡ Process</button>
+            <button class="btn btn-secondary" :disabled="busy" @click="importFixtures()">⬇ Import from ESPN</button>
+            <button class="btn btn-secondary" :disabled="busy" @click="loadMatches()">⟳ Refresh</button>
           </div>
+          <div style="margin-top:12px;max-height:240px;overflow:auto;border:1px solid var(--color-border);border-radius:8px">
+            <template x-for="m in matches" :key="m.id">
+              <div @click="selectMatch(m)"
+                   style="display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border-bottom:1px solid var(--color-border);font-size:var(--text-sm)"
+                   :style="scoring.match && scoring.match.id===m.id ? 'background:var(--color-surface-2)' : ''">
+                <span style="color:var(--color-text-muted);min-width:96px" x-text="fmtDate(m.date)"></span>
+                <span style="flex:1" x-text="m.homeTeam + ' v ' + m.awayTeam"></span>
+                <span class="badge" x-text="m.scoringProcessed ? '✓ scored' : m.status"></span>
+              </div>
+            </template>
+            <div x-show="matches.length===0" style="padding:12px;color:var(--color-text-muted);font-size:var(--text-sm)">No matches yet — import fixtures above.</div>
+          </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- Score a Match -->
+        <div class="admin-section" x-show="scoring.match" style="display:none">
+          <div class="admin-section-title">⚡ Score: <span x-text="scoring.match ? (scoring.match.homeTeam+' v '+scoring.match.awayTeam) : ''"></span></div>
+          <div class="admin-controls">
+            <button class="btn btn-primary" :disabled="busy" @click="fetchFromESPN()">⬇ Fetch from ESPN</button>
+            <span x-show="scoring.score" style="font-weight:600;font-size:var(--text-sm)" x-text="scoring.score"></span>
+          </div>
+          <div x-show="scoring.unmatched.length" style="margin:10px 0;padding:8px 10px;background:rgba(255,180,0,0.12);border-radius:8px;font-size:var(--text-xs)">
+            ⚠ ESPN events for players we couldn't auto-map — add them manually below:
+            <template x-for="u in scoring.unmatched" :key="u.name">
+              <span x-text="'• ' + u.name + ' (' + u.team + ') '"></span>
+            </template>
+          </div>
+          <div x-show="scoring.rows.length" style="overflow-x:auto;margin-top:8px">
+            <table style="width:100%;border-collapse:collapse;font-size:var(--text-xs)">
+              <thead>
+                <tr style="text-align:left;color:var(--color-text-muted)">
+                  <th style="padding:4px">Player</th><th>G</th><th>A</th><th>CS</th><th>YC</th><th>RC</th><th>W</th><th>D</th><th>Pts</th><th></th>
+                </tr>
+              </thead>
+              <tbody>
+                <template x-for="(row,idx) in scoring.rows" :key="row.playerId">
+                  <tr style="border-top:1px solid var(--color-border)">
+                    <td style="padding:4px;white-space:nowrap">
+                      <span x-text="row.name"></span>
+                      <span class="badge" :class="'badge-'+(row.position||'').toLowerCase()" x-text="row.position"></span>
+                    </td>
+                    <td><input type="number" min="0" style="width:40px" x-model.number="row.goals"></td>
+                    <td><input type="number" min="0" style="width:40px" x-model.number="row.assists"></td>
+                    <td style="text-align:center"><input type="checkbox" x-model="row.cleanSheet"></td>
+                    <td><input type="number" min="0" style="width:40px" x-model.number="row.yellowCards"></td>
+                    <td><input type="number" min="0" style="width:40px" x-model.number="row.redCards"></td>
+                    <td style="text-align:center"><input type="checkbox" x-model="row.teamWin"></td>
+                    <td style="text-align:center"><input type="checkbox" x-model="row.teamDraw"></td>
+                    <td style="font-weight:600;text-align:center" x-text="rowPoints(row)"></td>
+                    <td><button class="btn btn-sm btn-secondary" @click="scoring.rows.splice(idx,1)">✕</button></td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+          <div class="admin-controls" style="margin-top:10px;flex-wrap:wrap">
+            <select class="form-input" style="width:auto" x-model="scoring.addTeam" @change="scoring.addPlayer=''">
+              <option value="">Team…</option>
+              <option :value="scoring.match.homeTeam" x-text="scoring.match.homeTeam"></option>
+              <option :value="scoring.match.awayTeam" x-text="scoring.match.awayTeam"></option>
+            </select>
+            <select class="form-input" style="width:auto" x-model="scoring.addPlayer">
+              <option value="">Player…</option>
+              <template x-for="p in addablePlayers()" :key="p.id"><option :value="p.id" x-text="p.name"></option></template>
+            </select>
+            <button class="btn btn-secondary" :disabled="!scoring.addPlayer" @click="addRow()">+ Add</button>
+          </div>
+          <div class="admin-controls" style="margin-top:8px">
+            <button class="btn btn-success" :disabled="busy || !scoring.rows.length" @click="commitScores()">✓ Commit (<span x-text="scoring.rows.length"></span>)</button>
+          </div>
+          <p style="color:var(--color-text-muted);font-size:var(--text-xs);margin-top:8px">
+            Win/draw and clean-sheet are pre-filled from ESPN. If ESPN is unavailable, add players and enter stats by hand. Re-commit anytime to correct.
+          </p>
         </div>
 
         <div class="divider"></div>
@@ -273,7 +349,9 @@
         draftPickerUID: null,
         draftOrder: [],
         match: { id: '', homeTeam: '', awayTeam: '', homeScore: 0, awayScore: 0, stage: 'group' },
-        scores: { matchId: '', statsJson: '' },
+        matches: [],
+        players: [],
+        scoring: { match: null, rows: [], unmatched: [], score: '', addTeam: '', addPlayer: '' },
         importJson: '',
         exampleJson: JSON.stringify([
           { name: 'Erling Haaland', country: 'Norway', position: 'FWD', clubTeam: 'Man City', rating: 95 },
@@ -285,6 +363,7 @@
         checkAccess() {
           if (Alpine.store('auth').isAdmin) {
             this.loadDraftStatus();
+            this.loadMatches();
           }
         },
 
@@ -371,25 +450,105 @@
           }
         },
 
-        async processScores() {
-          if (!this.scores.matchId) { this.showToast('Match ID is required.'); return; }
-          let stats;
-          try {
-            stats = JSON.parse(this.scores.statsJson);
-            if (!Array.isArray(stats)) throw new Error();
-          } catch {
-            this.showToast('Invalid JSON — expected an array of stat objects.');
-            return;
-          }
+        async loadMatches() {
+          try { this.matches = (await Api.getMatches()) || []; }
+          catch (e) { this.showToast('Load matches failed: ' + e.message); }
+        },
+
+        async importFixtures() {
           this.busy = true;
           try {
-            const res = await Api.processScores(this.scores.matchId, stats);
-            this.showToast('Processed ' + res.processed + ' player(s). Leaderboard updated!');
+            const res = await Api.importFixtures();
+            this.showToast('Fixtures: ' + res.imported + ' new, ' + res.updated + ' updated'
+              + (res.skipped?.length ? ', ' + res.skipped.length + ' skipped' : ''));
+            await this.loadMatches();
+          } catch (e) { this.showToast('Import failed: ' + e.message); }
+          finally { this.busy = false; }
+        },
+
+        async ensurePlayers() {
+          if (this.players.length) return;
+          try { this.players = (await Api.getPlayers()) || []; } catch {}
+        },
+
+        async selectMatch(m) {
+          this.scoring = { match: m, rows: [], unmatched: [], score: '', addTeam: '', addPlayer: '' };
+          await this.ensurePlayers();
+        },
+
+        async fetchFromESPN() {
+          if (!this.scoring.match) return;
+          this.busy = true;
+          try {
+            const res = await Api.fetchScores(this.scoring.match.id, false);
+            this.scoring.score = res.home.team + ' ' + res.home.score + ' – '
+              + res.away.score + ' ' + res.away.team + '  (' + res.result + ')';
+            this.scoring.rows = (res.stats || []).map(s => ({
+              playerId: s.playerId, name: s.name, position: s.position,
+              goals: s.goals || 0, assists: s.assists || 0, cleanSheet: !!s.cleanSheet,
+              yellowCards: s.yellowCards || 0, redCards: s.redCards || 0,
+              teamWin: !!s.teamWin, teamDraw: !!s.teamDraw,
+            }));
+            this.scoring.unmatched = res.unmatched || [];
+            this.showToast('Fetched ' + this.scoring.rows.length + ' players'
+              + (this.scoring.unmatched.length ? ', ' + this.scoring.unmatched.length + ' unmatched' : ''));
           } catch (e) {
-            this.showToast('Error: ' + e.message);
-          } finally {
-            this.busy = false;
-          }
+            this.showToast('ESPN fetch failed: ' + e.message + ' — enter stats manually.');
+          } finally { this.busy = false; }
+        },
+
+        rowPoints(r) {
+          let p = 0;
+          p += (+r.goals || 0) * 5;
+          p += (+r.assists || 0) * 3;
+          if (r.cleanSheet && (r.position === 'GK' || r.position === 'DEF')) p += 4;
+          p -= (+r.yellowCards || 0) * 1;
+          p -= (+r.redCards || 0) * 3;
+          if (r.teamWin) p += 2; else if (r.teamDraw) p += 1;
+          return p;
+        },
+
+        addablePlayers() {
+          if (!this.scoring.addTeam) return [];
+          const taken = new Set(this.scoring.rows.map(r => r.playerId));
+          return this.players
+            .filter(p => p.country === this.scoring.addTeam && !taken.has(p.id))
+            .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        },
+
+        addRow() {
+          const p = this.players.find(x => x.id === this.scoring.addPlayer);
+          if (!p) return;
+          this.scoring.rows.push({
+            playerId: p.id, name: p.name, position: p.position,
+            goals: 0, assists: 0, cleanSheet: false, yellowCards: 0, redCards: 0,
+            teamWin: false, teamDraw: false,
+          });
+          this.scoring.addPlayer = '';
+        },
+
+        async commitScores() {
+          const m = this.scoring.match;
+          if (!m || !this.scoring.rows.length) return;
+          const stats = this.scoring.rows.map(r => ({
+            playerId: r.playerId, goals: +r.goals || 0, assists: +r.assists || 0,
+            cleanSheet: !!r.cleanSheet, yellowCards: +r.yellowCards || 0, redCards: +r.redCards || 0,
+            teamWin: !!r.teamWin, teamDraw: !!r.teamDraw,
+          }));
+          this.busy = true;
+          try {
+            const res = await Api.processScores(m.id, stats);
+            this.showToast('Committed ' + res.processed + ' players. Leaderboard updated!');
+            await this.loadMatches();
+          } catch (e) { this.showToast('Commit failed: ' + e.message); }
+          finally { this.busy = false; }
+        },
+
+        fmtDate(d) {
+          if (!d) return '';
+          const dt = new Date(d);
+          return dt.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+            + ' ' + dt.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
         },
 
         async importPlayers() {

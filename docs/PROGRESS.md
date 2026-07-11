@@ -1,6 +1,6 @@
 # WC Fantasy 2026 — Progress Tracker
 
-> Last updated: 2026-02-20
+> Last updated: 2026-02-21
 > For full architecture and data model, see: `fantasy-wc-plan.md`
 
 ---

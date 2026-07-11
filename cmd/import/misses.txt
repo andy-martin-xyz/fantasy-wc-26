@@ -1,0 +1,255 @@
+# 253 players had no CSV rating match (assigned default 66)
+# Team	POS	Name	Club
+Czech Republic	MF	Alexandr Sojka	FC Viktoria Plzeň
+Czech Republic	MF	Hugo Sochurek	AC Sparta Prague
+Mexico	GK	Raúl Rangel	Guadalajara
+Mexico	DF	Jorge Sánchez	PAOK
+Mexico	MF	Érik Lira	Cruz Azul
+Mexico	GK	Carlos Acevedo	Santos Laguna
+Mexico	FW	Armando González	Guadalajara
+Mexico	DF	Israel Reyes	América
+Mexico	FW	Guillermo Martínez	Pumas
+South Africa	DF	Thabang Matuludi	Polokwane City
+South Africa	DF	Khulumani Ndamane	Mamelodi Sundowns
+South Africa	MF	Thalente Mbatha	Orlando Pirates
+South Africa	DF	Aubrey Modiba	Mamelodi Sundowns
+South Africa	FW	Oswin Appollis	Orlando Pirates
+South Africa	FW	Tshepang Moremi	Orlando Pirates
+South Africa	FW	Relebohile Mofokeng	Orlando Pirates
+South Africa	MF	Themba Zwane	Mamelodi Sundowns
+South Africa	FW	Thapelo Maseko	AEL Limassol
+South Africa	DF	Mbekezeli Mbokazi	Chicago Fire
+South Africa	FW	Iqraam Rayners	Mamelodi Sundowns
+South Africa	GK	Sipho Chaine	Orlando Pirates
+South Africa	FW	Evidence Makgopa	Orlando Pirates
+South Africa	DF	Nkosinathi Sibisi	Orlando Pirates
+South Africa	DF	Khuliso Mudau	Mamelodi Sundowns
+South Africa	GK	Ricardo Goss	Siwelele
+South Africa	MF	Jayden Adams	Mamelodi Sundowns
+South Africa	FW	Kamogelo Sebelebele	Orlando Pirates
+South Africa	DF	Bradley Cross	Kaizer Chiefs
+South Korea	GK	Kim Seung-gyu	FC Tokyo
+South Korea	DF	Kim Tae-hyeon	Kashima Antlers
+South Korea	DF	Seol Young-woo	Red Star Belgrade
+South Korea	MF	Lee Dong-gyeong	Ulsan HD
+Bosnia and Herzegovina	DF	Nihad Mujaković	Gaziantep
+Bosnia and Herzegovina	GK	Mladen Jurkas	Borac Banja Luka
+Bosnia and Herzegovina	MF	Ivan Bašić	Astana
+Bosnia and Herzegovina	DF	Stjepan Radeljić	Rijeka
+Bosnia and Herzegovina	GK	Martin Zlomislić	Rijeka
+Bosnia and Herzegovina	MF	Ermin Mahmić	Slovan Liberec
+Qatar	GK	Mahmud Abunada	Al-Rayyan
+Qatar	DF	Pedro Miguel	Al-Sadd
+Qatar	DF	Lucas Mendes	Al-Wakrah
+Qatar	DF	Jassem Gaber	Al-Rayyan
+Qatar	MF	Abdulaziz Hatem	Al-Rayyan
+Qatar	FW	Ahmed Alaaeldin	Al-Rayyan
+Qatar	FW	Mohammed Muntari	Al-Gharafa
+Qatar	MF	Karim Boudiaf	Al-Duhail
+Qatar	DF	Ayoub Al-Oui	Al-Gharafa
+Qatar	DF	Homam Ahmed	Cultural Leonesa
+Qatar	FW	Yusuf Abdurisag	Al-Wakrah
+Qatar	DF	Boualem Khoukhi	Al-Sadd
+Qatar	MF	Ahmed Al-Ganehi	Al-Gharafa
+Qatar	DF	Sultan Al-Brake	Al-Duhail
+Qatar	MF	Ahmed Fathy	Al-Arabi
+Qatar	GK	Salah Zakaria	Al-Duhail
+Qatar	MF	Assim Madibo	Al-Wakrah
+Qatar	FW	Tahsin Jamshid	Al-Duhail
+Qatar	DF	Al-Hashmi Al-Hussain	Al-Arabi
+Qatar	FW	Mohamed Manai	Al-Shamal
+Switzerland	GK	Yvon Mvogo	Lorient
+Brazil	MF	Danilo Santos	Botafogo
+Haiti	DF	Keeto Thermoncy	Young Boys
+Haiti	DF	Ricardo Adé	LDU Quito
+Haiti	MF	Carl Sainté	El Paso Locomotive FC
+Haiti	FW	Duckens Nazon	Esteghlal
+Haiti	GK	Alexandre Pierre	Sochaux
+Haiti	DF	Duke Lacroix	Colorado Springs Switchbacks FC
+Haiti	MF	Leverton Pierre	Vizela
+Haiti	FW	Ruben Providence	Almere City
+Haiti	FW	Yassin Fortuné	Vizela
+Haiti	GK	Josué Duverger	Cosmos Koblenz
+Haiti	MF	Dominique Simon	Tatran Prešov
+Haiti	MF	Woodensky Pierre	Violette
+Morocco	GK	Munir Mohamedi	RS Berkane
+Morocco	DF	Youssef Belammari	Al Ahly
+Morocco	GK	Ahmed Reda Tagnaouti	AS FAR
+Scotland	MF	Tyler Fletcher	Manchester United
+Australia	DF	Jason Geria	Albirex Niigata
+Australia	MF	Paul Okon-Engstler	Sydney FC
+Paraguay	FW	Isidro Pitta	Red Bull Bragantino
+Curaçao	GK	Eloy Room	Miami FC
+Curaçao	DF	Jurién Gaari	Abha
+Curaçao	DF	Roshon van Eijma	RKC Waalwijk
+Curaçao	MF	Godfried Roemeratoe	RKC Waalwijk
+Curaçao	FW	Jeremy Antonisse	A.E. Kifisia F.C.
+Curaçao	FW	Tyrese Noslin	SC Telstar
+Curaçao	FW	Kenji Gorré	Maccabi Haifa F.C.
+Curaçao	FW	Jearl Margaritha	SK Beveren
+Curaçao	FW	Gervane Kastaneer	Terengganu FC
+Curaçao	DF	Joshua Brenet	Kayserispor
+Curaçao	MF	Kevin Felida	FC Den Bosch
+Curaçao	DF	Deveron Fonville	NEC Nijmegen
+Curaçao	GK	Tyrick Bodak	SC Telstar
+Curaçao	GK	Trevor Doornbusch	VVV-Venlo
+Ecuador	GK	Moisés Ramírez	Kifisia
+Ecuador	FW	Jeremy Arévalo	VfB Stuttgart
+Ecuador	DF	Jackson Porozo	Tijuana
+Japan	GK	Tomoki Hayakawa	Kashima Antlers
+Tunisia	GK	Mouhib Chamakh	Club Africain
+Tunisia	DF	Omar Rekik	Maribor
+Tunisia	DF	Adem Arous	Kasımpaşa
+Tunisia	FW	Hazem Mastouri	Dynamo Makhachkala
+Tunisia	MF	Khalil Ayari	Paris Saint-Germain
+Tunisia	GK	Aymen Dahmen	CS Sfaxien
+Tunisia	FW	Rayan Elloumi	Vancouver Whitecaps
+Tunisia	FW	Firas Chaouat	Club Africain
+Tunisia	DF	Mohamed Amine Ben Hamida	Espérance de Tunis
+Tunisia	GK	Sabri Ben Hessen	Étoile du Sahel
+Tunisia	DF	Raed Chikhaoui	US Monastir
+Egypt	DF	Yasser Ibrahim	Al Ahly
+Egypt	DF	Mohamed Hany	Al Ahly
+Egypt	DF	Hossam Abdelmaguid	Zamalek
+Egypt	FW	Hamza Abdelkarim	Barcelona B
+Egypt	MF	Mostafa Ziko	Pyramids
+Egypt	DF	Ahmed Fatouh	Zamalek
+Egypt	MF	Hamdy Fathy	Al-Wakrah
+Egypt	DF	Karim Hafez	Pyramids
+Egypt	GK	El Mahdy Soliman	Zamalek
+Egypt	MF	Mohanad Lasheen	Pyramids
+Egypt	MF	Nabil Emad	Al-Najma
+Egypt	MF	Marwan Attia	Al Ahly
+Egypt	MF	Mahmoud Saber	ZED
+Egypt	GK	Mostafa Shobeir	Al Ahly
+Egypt	DF	Tarek Alaa	ZED
+Egypt	GK	Mohamed Alaa	El Gouna
+Iran	DF	Saleh Hardani	Esteghlal
+Iran	DF	Shojae Khalilzadeh	Tractor
+Iran	DF	Milad Mohammadi	Persepolis
+Iran	MF	Saeid Ezatolahi	Shabab Al Ahli
+Iran	MF	Mohammad Mohebi	Rostov
+Iran	FW	Mehdi Ghayedi	Al Nasr
+Iran	FW	Ali Alipour	Persepolis
+Iran	GK	Payam Niazmand	Persepolis
+Iran	DF	Hossein Kanaanizadegan	Persepolis
+Iran	MF	Rouzbeh Cheshmi	Esteghlal
+Iran	MF	Mehdi Torabi	Tractor
+Iran	DF	Aria Yousefi	Sepahan
+Iran	FW	Amirhossein Hosseinzadeh	Tractor
+Iran	DF	Ali Nemati	Foolad
+Iran	FW	Shahriyar Moghanlou	Kalba
+Iran	MF	Mohammad Ghorbani	Al Wahda
+Iran	DF	Ramin Rezaeian	Foolad
+Iran	DF	Danial Eiri	Malavan
+Iran	MF	Amirmohammad Razzaghinia	Esteghlal
+New Zealand	MF	Sarpreet Singh	Wellington Phoenix
+New Zealand	DF	Tommy Smith	Braintree Town
+Cape Verde	GK	Vozinha	Chaves
+Cape Verde	DF	Stopira	Torreense
+Cape Verde	DF	Diney	Al Bataeh
+Cape Verde	MF	Kevin Pina	Krasnodar
+Cape Verde	FW	Gilson Benchimol	Akron Tolyatti
+Cape Verde	MF	Garry Rodrigues	Apollon Limassol
+Cape Verde	GK	Márcio Rosa	Montana
+Cape Verde	DF	Sidny Lopes Cabral	Benfica
+Cape Verde	MF	Deroy Duarte	Ludogorets Razgrad
+Cape Verde	MF	Laros Duarte	Puskás Akadémia
+Cape Verde	MF	Yannick Semedo	Farense
+Cape Verde	MF	Willy Semedo	Omonia
+Cape Verde	DF	Kelvin Pires	SJK
+Cape Verde	MF	Hélio Varela	Maccabi Tel Aviv
+Uruguay	FW	Brian Rodríguez	América
+Iraq	GK	Fahad Talib	Al-Talaba
+Iraq	DF	Rebin Sulaka	Port
+Iraq	DF	Hussein Ali	Pogon Szczecin
+Iraq	DF	Zaid Tahseen	Pakhtakor
+Iraq	DF	Akam Hashim	Al-Zawraa
+Iraq	DF	Manaf Younis	Al-Shorta
+Iraq	MF	Youssef Amyn	AEK Larnaca
+Iraq	FW	Mohanad Ali	Dibba
+Iraq	GK	Jalal Hassan	Al-Zawraa
+Iraq	FW	Ali Yousif	Al-Talaba
+Iraq	DF	Ahmed Maknzi	Al-Karma
+Iraq	GK	Ahmed Basil	Al-Shorta
+Iraq	MF	Zaid Ismail	Al-Talaba
+Iraq	DF	Mustafa Saadoon	Al-Shorta
+Iraq	DF	Frans Putros	Persib
+Senegal	FW	Cherif Ndiaye	Samsunspor
+Senegal	MF	Bara Sapoko Ndiaye	Bayern Munich
+Algeria	GK	Melvin Mastil	Stade Nyonnais
+Algeria	DF	Achref Abada	USM Alger
+Algeria	DF	Mohamed Amine Tougai	Espérance de Tunis
+Algeria	DF	Zineddine Belaïd	JS Kabylie
+Algeria	FW	Nadhir Benbouali	Győri ETO
+Algeria	GK	Oussama Benbot	USM Alger
+Algeria	FW	Adil Boulbina	Al-Duhail
+Jordan	GK	Yazeed Abulaila	Al-Hussein
+Jordan	DF	Mohammad Abu Hashish	Al-Karma
+Jordan	DF	Abdallah Nasib	Al-Zawraa
+Jordan	DF	Husam Abu Dahab	Al-Faisaly
+Jordan	MF	Amer Jamous	Al-Zawraa
+Jordan	FW	Mohammad Abu Zrayq	Raja Casablanca
+Jordan	MF	Noor Al-Rawabdeh	Selangor
+Jordan	FW	Ali Olwan	Al-Sailiya
+Jordan	FW	Odeh Al-Fakhouri	Pyramids
+Jordan	GK	Nour Bani Attiah	Al-Faisaly
+Jordan	FW	Mahmoud Al-Mardi	Al-Hussein
+Jordan	MF	Rajaei Ayed	Al-Hussein
+Jordan	MF	Ibrahim Sadeh	Al-Karma
+Jordan	DF	Mo Abualnadi	Selangor
+Jordan	DF	Salim Obaid	Al-Hussein
+Jordan	DF	Saed Al-Rosan	Al-Hussein
+Jordan	MF	Mohannad Abu Taha	Al-Quwa Al-Jawiya
+Jordan	MF	Nizar Al-Rashdan	Qatar SC
+Jordan	GK	Abdallah Al-Fakhouri	Al-Wehdat
+Jordan	DF	Ihsan Haddad	Al-Hussein
+Jordan	FW	Ali Azaizeh	Al-Shabab
+Jordan	MF	Mohammad Al-Dawoud	Al-Wehdat
+Jordan	DF	Anas Badawi	Al-Faisaly
+DR Congo	MF	Samuel Moutoussamy	Atromitos
+DR Congo	MF	Aaron Tshibola	Kilmarnock
+DR Congo	GK	Timothy Fayulu	Noah
+DR Congo	DF	Gédéon Kalulu	Aris Limassol
+Uzbekistan	GK	Utkir Yusupov	Navbahor
+Uzbekistan	DF	Khojiakbar Alijonov	Pakhtakor
+Uzbekistan	DF	Farrukh Sayfiev	Neftchi Fergana
+Uzbekistan	DF	Rustam Ashurmatov	Esteghlal
+Uzbekistan	MF	Akmal Mozgovoy	Pakhtakor
+Uzbekistan	MF	Otabek Shukurov	Baniyas
+Uzbekistan	MF	Jamshid Iskanderov	Neftchi Fergana
+Uzbekistan	MF	Odiljon Hamrobekov	Tractor
+Uzbekistan	MF	Jaloliddin Masharipov	Esteghlal
+Uzbekistan	MF	Oston Urunov	Persepolis
+Uzbekistan	GK	Abduvohid Nematov	Nasaf
+Uzbekistan	DF	Sherzod Nasrullaev	Nasaf
+Uzbekistan	DF	Umar Eshmurodov	Nasaf
+Uzbekistan	GK	Botirali Ergashev	Neftchi Fergana
+Uzbekistan	MF	Dostonbek Khamdamov	Pakhtakor
+Uzbekistan	DF	Abdulla Abdullaev	Dibba
+Uzbekistan	MF	Azizjon Ganiev	Al Bataeh
+Uzbekistan	FW	Azizbek Amonov	Dinamo Samarqand
+Uzbekistan	FW	Igor Sergeev	Persepolis
+Uzbekistan	MF	Abbosbek Fayzullaev	İstanbul Başakşehir
+Uzbekistan	MF	Sherzod Esanov	Bukhara
+Uzbekistan	DF	Bekhruz Karimov	Surkhon Termiz
+Uzbekistan	DF	Avazbek Ulmasaliev	AGMK
+Uzbekistan	DF	Jakhongir Urozov	Dinamo Samarqand
+Ghana	GK	Benjamin Asare	Hearts of Oak
+Ghana	DF	Derrick Luckassen	Pafos
+Panama	DF	César Blackman	Slovan Bratislava
+Panama	DF	Fidel Escobar	Saprissa
+Panama	DF	Edgardo Fariña	Pari Nizhny Novgorod
+Panama	MF	Cristian Martínez	Ironi Kiryat Shmona
+Panama	MF	José Luis Rodríguez	Juárez
+Panama	FW	Tomás Rodríguez	Saprissa
+Panama	MF	Yoel Bárcenas	Mazatlán
+Panama	GK	César Samudio	Maratón
+Panama	DF	Jiovany Ramos	Puerto Cabello
+Panama	DF	Eric Davis	Plaza Amador
+Panama	FW	Cecilio Waterman	Universidad de Concepción
+Panama	MF	Alberto Quintero	Plaza Amador
+Panama	MF	César Yanis	Cobresal
+Panama	FW	Azarias Londoño	Universidad Católica
+Panama	DF	Roderick Miller	Turan Tovuz
+Panama	DF	Jorge Gutiérrez	Deportivo La Guaira

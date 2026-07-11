@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Draft Room — WC Fantasy 2026</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/styles.css?v=3">
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
   <script defer src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
@@ -14,7 +14,7 @@
   <script defer src="js/api.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
-<body>
+<body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <div class="app-wrapper">
 
     <!-- Nav -->
@@ -23,19 +23,29 @@
         <span class="brand-icon">⚽</span>
         <span class="brand-text">WC <span>Fantasy</span></span>
       </a>
-      <div class="nav-actions" x-data>
-        <div class="spinner" x-show="$store.auth.authLoading"></div>
-        <a href="login.html" class="nav-link" x-show="!$store.auth.authLoading && !$store.auth.isLoggedIn" x-cloak>Sign In</a>
-        <div x-show="!$store.auth.authLoading && $store.auth.isLoggedIn" x-cloak style="display:flex;align-items:center;gap:12px">
-          <a href="draft.html" class="nav-link active">Draft</a>
-          <a href="my-team.html" class="nav-link">My Team</a>
-          <a href="admin.html" class="nav-link" x-show="$store.auth.isAdmin">Admin</a>
-          <div class="nav-avatar"
-               :class="'avatar-' + $store.auth.user?.colorIdx"
-               x-text="$store.auth.user?.initials"></div>
-        </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="spinner" x-show="$store.auth.authLoading" x-cloak></div>
+        <div class="nav-avatar" x-cloak
+             x-show="!$store.auth.authLoading && $store.auth.isLoggedIn"
+             :class="'avatar-' + $store.auth.user?.colorIdx"
+             x-text="$store.auth.user?.initials"></div>
+        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
+          <span x-text="navOpen ? '✕' : '☰'"></span>
+        </button>
       </div>
     </nav>
+    <div x-show="navOpen" x-cloak @click="navOpen = false"
+         style="position:fixed;inset:0;z-index:150"></div>
+    <div class="nav-drawer" x-show="navOpen" x-cloak>
+      <a href="index.html" class="nav-drawer-link">Standings</a>
+      <a href="draft.html" class="nav-drawer-link active" x-show="$store.auth.isLoggedIn">Draft</a>
+      <a href="teams.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">Teams</a>
+      <a href="my-team.html" class="nav-drawer-link" x-show="$store.auth.isLoggedIn">My Team</a>
+      <a href="admin.html" class="nav-drawer-link" x-show="$store.auth.isAdmin">Admin</a>
+      <div class="nav-drawer-divider"></div>
+      <a href="login.html" class="nav-drawer-link" x-show="!$store.auth.isLoggedIn && !$store.auth.authLoading">Sign In</a>
+      <button class="nav-drawer-link nav-drawer-signout" x-show="$store.auth.isLoggedIn" @click="signOutUser()">Sign Out</button>
+    </div>
 
     <!-- Draft Room -->
     <main class="page-content" x-data="draftPage()">
@@ -82,6 +92,34 @@
         </div>
       </div>
 
+      <!-- Draft history -->
+      <div style="margin-bottom:16px">
+        <div class="section-label" style="margin-bottom:8px">Draft History</div>
+        <template x-if="history.length === 0">
+          <div class="card" style="padding:16px;color:var(--color-text-muted);font-size:var(--text-sm);text-align:center">
+            No picks yet — draft hasn't started
+          </div>
+        </template>
+        <div class="card" x-show="history.length > 0"
+             style="padding:0;overflow:hidden;max-height:320px;overflow-y:auto"
+             x-ref="historyList">
+          <template x-for="entry in history" :key="entry.pick">
+            <div class="pick-log-item">
+              <div class="pick-number" x-text="entry.pick"></div>
+              <div class="pick-detail">
+                <div class="pick-player-name" x-text="entry.player"></div>
+                <div class="pick-owner">
+                  <span :class="'badge badge-' + entry.pos.toLowerCase()" x-text="entry.pos"></span>
+                  &nbsp;→&nbsp;
+                  <span x-text="entry.name"></span>
+                  <span style="color:var(--color-text-dim)"> · R<span x-text="entry.round"></span></span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- AI Suggestions (only visible on your turn) -->
       <div class="card" style="margin-bottom:16px" x-show="isMyTurn">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
@@ -113,6 +151,12 @@
                placeholder="Search players…"
                x-model="search"
                style="margin-bottom:8px">
+        <select class="form-input" x-model="nationFilter" style="margin-bottom:8px">
+          <option value="ALL">All nations</option>
+          <template x-for="nation in nations" :key="nation">
+            <option :value="nation" x-text="nation"></option>
+          </template>
+        </select>
         <div class="tabs">
           <template x-for="tab in ['ALL','GK','DEF','MID','FWD']" :key="tab">
             <button class="tab-btn"
@@ -129,7 +173,8 @@
       </div>
 
       <!-- Player list -->
-      <div>
+      <div x-ref="playerList" @scroll="loadMoreOnScroll($event)"
+           style="max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch">
         <template x-if="playersLoading">
           <div class="empty-state" style="padding:32px 16px">
             <div class="spinner"></div>
@@ -143,7 +188,7 @@
           </div>
         </template>
 
-        <template x-for="player in filteredPlayers" :key="player.id">
+        <template x-for="player in visiblePlayers" :key="player.id">
           <div class="draft-player-card">
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:var(--text-sm)" x-text="player.name"></div>
@@ -152,6 +197,8 @@
                 <span>·</span>
                 <span :class="'badge badge-' + playerPos(player).toLowerCase()"
                       x-text="playerPos(player)"></span>
+                <span x-show="player.clubTeam">·</span>
+                <span x-show="player.clubTeam" x-text="player.clubTeam"></span>
               </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
@@ -166,33 +213,11 @@
             </div>
           </div>
         </template>
-      </div>
 
-      <!-- Draft history -->
-      <div style="margin-top:24px">
-        <div class="section-label">Draft History</div>
-        <template x-if="history.length === 0">
-          <div class="card" style="padding:16px;color:var(--color-text-muted);font-size:var(--text-sm);text-align:center">
-            No picks yet — draft hasn't started
-          </div>
-        </template>
-        <div class="card" x-show="history.length > 0"
-             style="padding:0;overflow:hidden;max-height:320px;overflow-y:auto"
-             x-ref="historyList">
-          <template x-for="entry in history" :key="entry.pick">
-            <div class="pick-log-item">
-              <div class="pick-number" x-text="entry.pick"></div>
-              <div class="pick-detail">
-                <div class="pick-player-name" x-text="entry.player"></div>
-                <div class="pick-owner">
-                  <span :class="'badge badge-' + entry.pos.toLowerCase()" x-text="entry.pos"></span>
-                  &nbsp;→&nbsp;
-                  <span x-text="entry.name"></span>
-                  <span style="color:var(--color-text-dim)"> · R<span x-text="entry.round"></span></span>
-                </div>
-              </div>
-            </div>
-          </template>
+        <!-- Lazy-load hint: shown while more players remain below the fold. -->
+        <div x-show="!playersLoading && visiblePlayers.length < filteredPlayers.length"
+             style="text-align:center;padding:10px;color:var(--color-text-muted);font-size:var(--text-xs)">
+          Scroll for more…
         </div>
       </div>
 
@@ -225,8 +250,13 @@
         playersLoading:   true,
 
         // --- Filters ---
-        posFilter: 'ALL',
-        search:    '',
+        posFilter:    'ALL',
+        nationFilter: 'ALL',
+        search:       '',
+
+        // --- Lazy rendering (only render renderLimit cards; grow on scroll) ---
+        renderLimit: 40,
+        renderStep:  40,
 
         // --- History (from Firestore picks sub-collection) ---
         history: [],
@@ -264,6 +294,14 @@
 
           this.$watch('$store.auth.authLoading', v => { if (!v) this.loadAll(); });
           if (!Alpine.store('auth').authLoading) this.loadAll();
+
+          // Reset the lazy-render window whenever a filter changes, and scroll
+          // the list back to the top.
+          ['search', 'posFilter', 'nationFilter'].forEach(f =>
+            this.$watch(f, () => {
+              this.renderLimit = this.renderStep;
+              if (this.$refs.playerList) this.$refs.playerList.scrollTop = 0;
+            }));
         },
 
         destroy() {
@@ -453,6 +491,11 @@
           return slots;
         },
 
+        get nations() {
+          return [...new Set(this.allPlayers.map(p => p.country).filter(Boolean))]
+            .sort((a, b) => a.localeCompare(b));
+        },
+
         get filteredPlayers() {
           const draftedSet = new Set(this.draftedPlayerIds);
           return this.allPlayers.filter(p => {
@@ -461,11 +504,29 @@
             // Position filter
             const pos = this.playerPos(p);
             if (this.posFilter !== 'ALL' && pos !== this.posFilter) return false;
+            // Nation filter
+            if (this.nationFilter !== 'ALL' && p.country !== this.nationFilter) return false;
             // Search filter
             const q = this.search.toLowerCase();
             if (q && !p.name.toLowerCase().includes(q) && !(p.country || '').toLowerCase().includes(q)) return false;
             return true;
-          });
+          })
+          // Highest-rated players first.
+          .sort((a, b) => (b.rating || 0) - (a.rating || 0));
+        },
+
+        // Only the first renderLimit players are rendered; grows on scroll.
+        get visiblePlayers() {
+          return this.filteredPlayers.slice(0, this.renderLimit);
+        },
+
+        // Grow the render window as the user nears the bottom of the list.
+        loadMoreOnScroll(e) {
+          const el = e.target;
+          if (el.scrollHeight - el.scrollTop - el.clientHeight < 240 &&
+              this.renderLimit < this.filteredPlayers.length) {
+            this.renderLimit += this.renderStep;
+          }
         },
 
         // -------------------------------------------------------

@@ -1,0 +1,13 @@
+# lumen-policy.yaml
+version: 1
+network_policies:
+  egress:
+    - host: host.docker.internal
+      port: 11434
+      methods: ["GET", "POST"]
+    - host: github.com
+      port: 443
+      methods: ["GET"]
+    - host: objects.githubusercontent.com
+      port: 443
+      methods: ["GET"]

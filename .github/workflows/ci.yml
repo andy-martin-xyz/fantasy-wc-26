@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache: true
+
+      - name: Set up Java (required by the Firestore emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Install Firebase CLI
+        run: npm install -g firebase-tools
+
+      - name: Start Firestore emulator
+        run: |
+          firebase emulators:start --only firestore --project fantasy-league-ci &
+          for i in $(seq 1 30); do
+            if curl -s http://localhost:8080 > /dev/null; then
+              echo "Firestore emulator is up"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "Firestore emulator did not start in time" >&2
+          exit 1
+
+      - name: Build
+        run: go build ./...
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Test
+        env:
+          FIRESTORE_EMULATOR_HOST: localhost:8080
+        run: go test ./... -v
