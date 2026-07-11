@@ -173,7 +173,8 @@ type TeamSide struct {
 
 // Summary is the reduced match result.
 type Summary struct {
-	Completed bool
+	State     string // "pre" | "in" | "post" — from ESPN's status.type.state
+	Completed bool   // true when State == "post"
 	Home      TeamSide
 	Away      TeamSide
 }
@@ -248,7 +249,10 @@ func FetchSummary(ctx context.Context, eventID string) (*Summary, error) {
 	}
 
 	comp := r.Header.Competitions[0]
-	s := &Summary{Completed: comp.Status.Type.Completed || comp.Status.Type.State == "post"}
+	s := &Summary{
+		State:     comp.Status.Type.State,
+		Completed: comp.Status.Type.Completed || comp.Status.Type.State == "post",
+	}
 
 	// Home/away identity + score.
 	for _, c := range comp.Competitors {
