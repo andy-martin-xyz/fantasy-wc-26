@@ -7,10 +7,8 @@ import (
 	"os"
 	"time"
 
-	firebase "firebase.google.com/go/v4"
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
-	"google.golang.org/api/option"
 
 	"github.com/andrewmartin/fantasy-league/internal/db"
 	"github.com/andrewmartin/fantasy-league/internal/handlers"
@@ -30,18 +28,16 @@ func main() {
 	}
 	defer dbClient.Close()
 
-	// Firebase app for Auth client.
-	projectID := os.Getenv("FIREBASE_PROJECT_ID")
-	firebaseConf := &firebase.Config{ProjectID: projectID}
-	var firebaseApp *firebase.App
-	if credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); credFile != "" {
-		firebaseApp, err = firebase.NewApp(ctx, firebaseConf, option.WithCredentialsFile(credFile))
-	} else {
-		firebaseApp, err = firebase.NewApp(ctx, firebaseConf)
-	}
-	if err != nil {
-		log.Error("init firebase app", "err", err)
-		os.Exit(1)
+	// Auth client from the shared Firebase app. db.New leaves App nil in
+	// emulator mode (Firestore connects directly), so build one there — the
+	// Auth emulator needs no credentials either way.
+	firebaseApp := dbClient.App
+	if firebaseApp == nil {
+		firebaseApp, err = db.NewFirebaseApp(ctx)
+		if err != nil {
+			log.Error("init firebase app", "err", err)
+			os.Exit(1)
+		}
 	}
 
 	authClient, err := firebaseApp.Auth(ctx)
