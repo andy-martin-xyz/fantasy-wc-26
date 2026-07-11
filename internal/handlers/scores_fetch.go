@@ -67,7 +67,7 @@ func (h *Handler) FetchScores(w http.ResponseWriter, r *http.Request) {
 			if !a.Played {
 				continue
 			}
-			// Exact ESPN-id match first (resolved once by cmd/espn-ids); fall
+			// Exact ESPN-id match first (ids resolved once, pre-tournament); fall
 			// back to nation-scoped name matching only when no id is stored.
 			pid, pos := "", ""
 			if c, ok := byESPN[a.ESPNID]; ok && a.ESPNID != "" {
