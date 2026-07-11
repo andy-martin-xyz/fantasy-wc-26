@@ -15,9 +15,28 @@ import (
 )
 
 // Client holds a Firestore client and the Firebase project ID.
+// App is the shared Firebase app in production (nil when connected to the
+// local emulator, which needs no app).
 type Client struct {
 	FS        *firestore.Client
+	App       *firebase.App
 	ProjectID string
+}
+
+// NewFirebaseApp builds a Firebase app for the configured project, using
+// GOOGLE_APPLICATION_CREDENTIALS when set and Application Default
+// Credentials otherwise. Shared by Firestore (production) and Auth so the
+// env-var/credential wiring lives in exactly one place.
+func NewFirebaseApp(ctx context.Context) (*firebase.App, error) {
+	projectID := os.Getenv("FIREBASE_PROJECT_ID")
+	if projectID == "" {
+		return nil, fmt.Errorf("FIREBASE_PROJECT_ID env var not set")
+	}
+	conf := &firebase.Config{ProjectID: projectID}
+	if credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); credFile != "" {
+		return firebase.NewApp(ctx, conf, option.WithCredentialsFile(credFile))
+	}
+	return firebase.NewApp(ctx, conf)
 }
 
 // New initialises a Firestore client.
@@ -42,16 +61,7 @@ func New(ctx context.Context) (*Client, error) {
 	}
 
 	// Production: use Firebase Admin SDK with credentials.
-	conf := &firebase.Config{ProjectID: projectID}
-	var (
-		app *firebase.App
-		err error
-	)
-	if credFile := os.Getenv("GOOGLE_APPLICATION_CREDENTIALS"); credFile != "" {
-		app, err = firebase.NewApp(ctx, conf, option.WithCredentialsFile(credFile))
-	} else {
-		app, err = firebase.NewApp(ctx, conf)
-	}
+	app, err := NewFirebaseApp(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("initialise firebase app: %w", err)
 	}
@@ -61,7 +71,7 @@ func New(ctx context.Context) (*Client, error) {
 		return nil, fmt.Errorf("initialise firestore client: %w", err)
 	}
 
-	return &Client{FS: fs, ProjectID: projectID}, nil
+	return &Client{FS: fs, App: app, ProjectID: projectID}, nil
 }
 
 // Close releases the underlying Firestore connection.
