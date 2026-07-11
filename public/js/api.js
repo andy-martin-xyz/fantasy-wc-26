@@ -140,5 +140,19 @@
     processScores(matchId, stats) {
       return apiCall('POST', '/api/admin/scores/process', { matchId, stats });
     },
+
+    getMatches() {
+      return apiCall('GET', '/api/admin/matches');
+    },
+
+    importFixtures(dates) {
+      return apiCall('POST', '/api/admin/fixtures/import', dates ? { dates } : {});
+    },
+
+    // commit=false → preview (computed stats, no writes); commit=true → apply.
+    fetchScores(matchId, commit) {
+      const q = commit ? '?commit=true' : '';
+      return apiCall('POST', '/api/admin/scores/fetch/' + encodeURIComponent(matchId) + q);
+    },
   };
 })();

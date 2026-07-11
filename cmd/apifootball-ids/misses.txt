@@ -1,0 +1,28 @@
+# Players with no API-Football ID match.
+# Country	POS	Name	Club
+Brazil	GK	Alisson	Liverpool
+Brazil	MID	Éderson Silva	Atalanta
+Brazil	DEF	Gabriel Magalhães	Arsenal
+Brazil	DEF	Marquinhos	Paris Saint-Germain
+Brazil	MID	Casemiro	Manchester United
+Brazil	DEF	Alex Sandro	Flamengo
+Brazil	FWD	Vinícius Júnior	Real Madrid
+Brazil	MID	Bruno Guimarães	Newcastle United
+Brazil	FWD	Matheus Cunha	Manchester United
+Brazil	FWD	Neymar	Santos
+Brazil	FWD	Raphinha	Barcelona
+Brazil	GK	Weverton	Grêmio
+Brazil	DEF	Danilo Luiz	Flamengo
+Brazil	DEF	Bremer	Juventus
+Brazil	DEF	Léo Pereira	Flamengo
+Brazil	DEF	Douglas Santos	Zenit Saint Petersburg
+Brazil	MID	Fabinho	Al-Ittihad
+Brazil	MID	Danilo Santos	Botafogo
+Brazil	FWD	Endrick	Lyon
+Brazil	MID	Lucas Paquetá	Flamengo
+Brazil	FWD	Luiz Henrique	Zenit Saint Petersburg
+Brazil	FWD	Gabriel Martinelli	Arsenal
+Brazil	GK	Ederson Moraes	Fenerbahçe
+Brazil	DEF	Roger Ibáñez	Al-Ahli
+Brazil	FWD	Igor Thiago	Brentford
+Brazil	FWD	Rayan	Bournemouth
