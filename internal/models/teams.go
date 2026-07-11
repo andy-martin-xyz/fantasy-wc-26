@@ -12,7 +12,7 @@ type Team struct {
 
 // WC2026Teams lists the 48 qualified nations for FIFA World Cup 2026, in group
 // order (A–L). This mirrors the official squads list and matches the Country
-// values used by the imported player pool (see cmd/import).
+// values used by the imported player pool.
 var WC2026Teams = []Team{
 	// Group A
 	{Name: "Czech Republic", Flag: "🇨🇿", Confederation: "UEFA", Group: "A"},
