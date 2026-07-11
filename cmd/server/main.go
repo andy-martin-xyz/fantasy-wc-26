@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	firebase "firebase.google.com/go/v4"
@@ -58,7 +59,7 @@ func main() {
 	r.Use(chimiddleware.RealIP)
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.Recoverer)
-	r.Use(corsMiddleware(os.Getenv("ALLOWED_ORIGIN"), log))
+	r.Use(corsMiddleware(os.Getenv("ALLOWED_ORIGIN")))
 
 	// Cron route: no 30s timeout — backfill may process dozens of matches.
 	// Protected by CRON_SECRET; Cloud Scheduler sends it as X-Cron-Secret.
@@ -151,17 +152,15 @@ func cronAuthMiddleware(secret string) func(http.Handler) http.Handler {
 	}
 }
 
-// corsMiddleware allows requests from the configured origin (and always from localhost).
-func corsMiddleware(allowedOrigin string, log *slog.Logger) func(http.Handler) http.Handler {
+// corsMiddleware allows cross-origin requests only from the configured
+// production origin (ALLOWED_ORIGIN) and local dev servers. In production the
+// frontend reaches the API same-origin via the Firebase Hosting /api/**
+// rewrite, so these headers mostly matter for local development.
+func corsMiddleware(allowedOrigin string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			origin := r.Header.Get("Origin")
-			log.Debug("cors", "origin", origin, "method", r.Method, "path", r.URL.Path)
-			allowed := origin != "" // allow any origin that sends one (dev-friendly)
-			if !allowed && allowedOrigin != "" {
-				allowed = origin == allowedOrigin
-			}
-			if allowed {
+			if originAllowed(origin, allowedOrigin) {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
@@ -174,4 +173,21 @@ func corsMiddleware(allowedOrigin string, log *slog.Logger) func(http.Handler) h
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// originAllowed reports whether a request Origin may receive CORS headers:
+// the configured production origin, or any localhost/127.0.0.1 dev server.
+func originAllowed(origin, allowedOrigin string) bool {
+	if origin == "" {
+		return false
+	}
+	if allowedOrigin != "" && origin == allowedOrigin {
+		return true
+	}
+	for _, dev := range []string{"http://localhost", "http://127.0.0.1"} {
+		if origin == dev || strings.HasPrefix(origin, dev+":") {
+			return true
+		}
+	}
+	return false
 }
