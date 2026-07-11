@@ -85,6 +85,32 @@ on roster size and how many matches are live simultaneously.
 
 ---
 
+## 5. AutoScore idle-tick cost cut to near zero (branch: perf/reduce-autoscore-polling)
+
+**File:** `internal/handlers/scores_auto.go`
+
+**Before:** Every cron tick — even with nothing live — did an ESPN fixtures
+API call plus **two** full `matches` collection reads (~101 docs each): one in
+`syncMissingFixtures` to build the already-imported set, one to scan for
+unscored matches.
+
+**After:**
+- Unscored matches come from `Where("scoringProcessed", "==", false)` — a
+  single-field equality query (auto-indexed, no composite index needed) that
+  returns only the handful of remaining fixtures instead of the whole
+  collection.
+- Fixture sync is gated to once per hour via a `meta/autoScore` state doc
+  (1 doc read per tick). The timestamp only advances on a successful sync, so
+  failures retry on the next tick. Knockout fixtures resolve at most daily, so
+  hourly still imports the final/3rd-place fixtures days before kickoff.
+
+**Impact:** idle tick drops from ~200+ doc reads + 1 external API call to
+~4 doc reads and no ESPN call. Verified against production data first:
+all 101 match docs carry the `scoringProcessed` field, so the query strands
+nothing.
+
+---
+
 ## Also fixed while in here: broken draft handler tests
 
 Unrelated to Firestore cost, but found while verifying the changes above
