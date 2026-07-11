@@ -12,32 +12,60 @@ import (
 	"github.com/andrewmartin/fantasy-league/internal/models"
 )
 
+// fixtureSyncInterval is how often the full ESPN fixture list is re-synced.
+// Knockout fixtures resolve at most once a day (after the previous round's
+// matches finish), so hourly is comfortably ahead of any kickoff while
+// avoiding an ESPN call + full matches read on every few-minute tick.
+const fixtureSyncInterval = time.Hour
+
+// autoScoreState is stored at meta/autoScore and gates the fixture sync.
+type autoScoreState struct {
+	LastFixtureSync time.Time `firestore:"lastFixtureSync"`
+}
+
 // AutoScore handles POST /api/cron/scores/poll.
-// Step 1: syncs any ESPN fixtures not yet in Firestore (so knockout matches
-//         appear as soon as ESPN resolves real team names).
+// Step 1: at most once per fixtureSyncInterval, syncs any ESPN fixtures not
+//         yet in Firestore (so knockout matches appear as ESPN resolves real
+//         team names).
 // Step 2: for every unscored match whose kickoff has passed, fetches ESPN's
 //         current state. In-progress ("in") matches are scored on every tick so
 //         goals appear live; finished ("post") matches are scored once and
-//         marked scoringProcessed so they skip future ticks. The leaderboard
-//         recalculates after every individual match write.
+//         marked scoringProcessed so they skip future ticks.
 // Idempotent — safe to call every few minutes.
 func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
 	defer cancel()
 
-	// Phase 1: sync fixtures — import any ESPN events missing from Firestore.
-	imported, syncErr := h.syncMissingFixtures(ctx)
-	if syncErr != nil {
-		h.Log.Warn("auto-score: fixture sync failed (continuing to score)", "err", syncErr)
+	// Phase 1: fixture sync, gated to fixtureSyncInterval. A missing state doc
+	// decodes to the zero time, so the first tick always syncs. The timestamp
+	// only advances on success, so a failed sync retries next tick.
+	var st autoScoreState
+	if _, err := h.DB.GetDoc(ctx, "meta", "autoScore", &st); err != nil {
+		h.Log.Warn("auto-score: read sync state (treating as never synced)", "err", err)
+	}
+	imported, syncRan := 0, false
+	if time.Since(st.LastFixtureSync) >= fixtureSyncInterval {
+		var syncErr error
+		imported, syncErr = h.syncMissingFixtures(ctx)
+		if syncErr != nil {
+			h.Log.Warn("auto-score: fixture sync failed (continuing to score)", "err", syncErr)
+		} else {
+			syncRan = true
+			if err := h.DB.SetDoc(ctx, "meta", "autoScore", autoScoreState{LastFixtureSync: time.Now().UTC()}); err != nil {
+				h.Log.Warn("auto-score: save sync state", "err", err)
+			}
+		}
 	}
 
-	// Phase 2: load all unscored matches whose kickoff has passed.
-	// Live matches (state="in") reappear every tick; only a post-game write
-	// sets scoringProcessed=true so they drop out of future polls.
+	// Phase 2: query only unscored matches instead of scanning the whole
+	// collection. Live matches (state="in") reappear every tick; only a
+	// post-game write sets scoringProcessed=true so they drop out of the query.
 	now := time.Now()
-	docs, err := h.DB.FS.Collection("matches").Documents(ctx).GetAll()
+	docs, err := h.DB.FS.Collection("matches").
+		Where("scoringProcessed", "==", false).
+		Documents(ctx).GetAll()
 	if err != nil {
-		h.Log.Error("auto-score: list matches", "err", err)
+		h.Log.Error("auto-score: list unscored matches", "err", err)
 		writeError(w, http.StatusInternalServerError, "could not list matches")
 		return
 	}
@@ -48,7 +76,7 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 		if d.DataTo(&m) != nil {
 			continue
 		}
-		if m.ScoringProcessed || m.ESPNEventID == "" {
+		if m.ESPNEventID == "" {
 			continue
 		}
 		if !m.Date.Before(now) {
@@ -57,10 +85,11 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 		todo = append(todo, m)
 	}
 
-	h.Log.Info("auto-score: candidates", "count", len(todo), "fixtures_imported", imported)
+	h.Log.Info("auto-score: candidates", "count", len(todo), "fixture_sync_ran", syncRan, "fixtures_imported", imported)
 
 	if len(todo) == 0 {
 		writeJSON(w, http.StatusOK, map[string]any{
+			"fixture_sync_ran":  syncRan,
 			"fixtures_imported": imported,
 			"candidates":        0,
 			"scored":            0,
@@ -210,8 +239,9 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.Log.Info("auto-score: complete", "candidates", len(todo), "scored", scored, "fixtures_imported", imported)
+	h.Log.Info("auto-score: complete", "candidates", len(todo), "scored", scored, "fixture_sync_ran", syncRan, "fixtures_imported", imported)
 	writeJSON(w, http.StatusOK, map[string]any{
+		"fixture_sync_ran":  syncRan,
 		"fixtures_imported": imported,
 		"candidates":        len(todo),
 		"scored":            scored,
