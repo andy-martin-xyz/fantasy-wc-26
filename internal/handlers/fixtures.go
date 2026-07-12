@@ -1,12 +1,16 @@
 package handlers
 
 import (
+	"context"
 	"net/http"
 	"sort"
 
 	"github.com/andrewmartin/fantasy-league/internal/espn"
 	"github.com/andrewmartin/fantasy-league/internal/models"
 )
+
+// wcTournamentDates is ESPN's dates value for the whole tournament window.
+const wcTournamentDates = "20260611-20260719"
 
 // ImportFixtures handles POST /api/admin/fixtures/import.
 // Pulls the World Cup schedule from ESPN and upserts a match doc per fixture
@@ -21,7 +25,7 @@ func (h *Handler) ImportFixtures(w http.ResponseWriter, r *http.Request) {
 	_ = decode(r, &req) // body optional
 	dates := req.Dates
 	if dates == "" {
-		dates = "20260611-20260719"
+		dates = wcTournamentDates
 	}
 	ctx := r.Context()
 
@@ -32,13 +36,34 @@ func (h *Handler) ImportFixtures(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	imported, updated := 0, 0
-	var skipped []map[string]string
+	res := h.upsertFixtures(ctx, fixtures, true)
+
+	h.Log.Info("fixtures imported", "imported", res.Imported, "updated", res.Updated, "skipped", len(res.Skipped))
+	writeJSON(w, http.StatusOK, map[string]any{
+		"imported": res.Imported, "updated": res.Updated, "skipped": res.Skipped, "total": len(fixtures),
+	})
+}
+
+// fixtureUpsertResult summarises one upsertFixtures pass.
+type fixtureUpsertResult struct {
+	Imported int                 // fixtures newly created
+	Updated  int                 // existing fixtures refreshed (updateExisting only)
+	Skipped  []map[string]string // fixtures with unrecognised (placeholder) team names
+}
+
+// upsertFixtures writes match docs for recognised fixtures — the one
+// fixture→match path shared by the admin import and the cron sync.
+// Placeholder team names (e.g. "Semifinal Winner") are skipped until ESPN
+// resolves them. With updateExisting=false, fixtures already in Firestore are
+// left untouched (cron sync); with true they are refreshed, preserving the
+// scoring state of already-scored matches (admin re-import).
+func (h *Handler) upsertFixtures(ctx context.Context, fixtures []espn.Fixture, updateExisting bool) fixtureUpsertResult {
+	var res fixtureUpsertResult
 	for _, f := range fixtures {
 		home := models.NormalizeTeamName(f.HomeTeam)
 		away := models.NormalizeTeamName(f.AwayTeam)
 		if home == "" || away == "" {
-			skipped = append(skipped, map[string]string{
+			res.Skipped = append(res.Skipped, map[string]string{
 				"home": f.HomeTeam, "away": f.AwayTeam, "reason": "unrecognised team name",
 			})
 			continue
@@ -53,35 +78,37 @@ func (h *Handler) ImportFixtures(w http.ResponseWriter, r *http.Request) {
 			ESPNEventID: f.EventID,
 		}
 
-		// Preserve scoring state if this match was already processed.
 		var existing models.Match
 		found, err := h.DB.GetDoc(ctx, "matches", f.EventID, &existing)
 		if err != nil {
-			h.Log.Error("import fixtures: get match", "id", f.EventID, "err", err)
+			h.Log.Error("upsert fixtures: get match", "id", f.EventID, "err", err)
 			continue
 		}
 		if found {
+			if !updateExisting {
+				continue // cron sync never touches known fixtures
+			}
+			// Preserve scoring state if this match was already processed.
 			if existing.ScoringProcessed {
 				match.ScoringProcessed = true
 				match.Status = "complete"
 				match.HomeScore = existing.HomeScore
 				match.AwayScore = existing.AwayScore
 			}
-			updated++
-		} else {
-			imported++
 		}
 
 		if err := h.DB.SetDoc(ctx, "matches", f.EventID, match); err != nil {
-			h.Log.Error("import fixtures: set match", "id", f.EventID, "err", err)
+			h.Log.Error("upsert fixtures: set match", "id", f.EventID, "err", err)
 			continue
 		}
+		if found {
+			res.Updated++
+		} else {
+			res.Imported++
+			h.Log.Info("upsert fixtures: imported", "id", f.EventID, "home", home, "away", away, "date", f.Date.Format("Jan 02"))
+		}
 	}
-
-	h.Log.Info("fixtures imported", "imported", imported, "updated", updated, "skipped", len(skipped))
-	writeJSON(w, http.StatusOK, map[string]any{
-		"imported": imported, "updated": updated, "skipped": skipped, "total": len(fixtures),
-	})
+	return res
 }
 
 // GetMatches handles GET /api/admin/matches — all matches, soonest first.
