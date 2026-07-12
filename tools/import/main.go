@@ -1,15 +1,21 @@
-// cmd/import builds the real WC 2026 player pool.
+// tools/import builds the WC 2026 player pool. This is a one-time/per-tournament
+// bootstrap tool, not part of the deployed service — kept for the next World
+// Cup rather than deleted, since resolving squads + ratings + ESPN ids from
+// scratch is real work.
 //
-// It reads the announced squads (cmd/import/data/*.tsv, one line per player:
+// It reads the announced squads (tools/import/data/*.tsv, one line per player:
 // "Team\tPOS\tName\tClub") and enriches each player with an FIFA-style overall
 // rating matched from the EA FC26 men's CSV. It maps Wikipedia positions
 // (GK/DF/MF/FW) to the app's GK/DEF/MID/FWD, and emits a players.json payload
 // shaped exactly like POST /api/admin/players/import.
 //
+// tools/espn-ids enriches this same players.json in place with ESPN athlete
+// ids afterwards — run this first, then that.
+//
 // Usage:
 //
-//	go run ./cmd/import                       # write cmd/import/players.json
-//	go run ./cmd/import -firestore            # also upsert to Firestore (needs
+//	go run ./tools/import                     # write tools/import/players.json
+//	go run ./tools/import -firestore          # also upsert to Firestore (needs
 //	                                          # FIRESTORE_EMULATOR_HOST, or
 //	                                          # SEED_PRODUCTION=true for prod)
 //
@@ -38,9 +44,9 @@ import (
 func main() {
 	var (
 		csvPath      = flag.String("csv", "/Users/andrewmartin/Downloads/archive/EAFC26-Men.csv", "path to EA FC26 men's CSV")
-		dataDir      = flag.String("data", "cmd/import/data", "directory of squad .tsv files")
-		outPath      = flag.String("out", "cmd/import/players.json", "output JSON path (import-endpoint shape)")
-		overridePath = flag.String("overrides", "cmd/import/overrides.tsv", "manual rating overrides (Country\\tName\\tRating)")
+		dataDir      = flag.String("data", "tools/import/data", "directory of squad .tsv files")
+		outPath      = flag.String("out", "tools/import/players.json", "output JSON path (import-endpoint shape)")
+		overridePath = flag.String("overrides", "tools/import/overrides.tsv", "manual rating overrides (Country\\tName\\tRating)")
 		missDefault  = flag.Int("miss-default", 66, "rating assigned to players with no CSV match (≈ real CSV median)")
 		toFirestore  = flag.Bool("firestore", false, "also upsert players directly to Firestore")
 		clearFirst   = flag.Bool("clear", false, "delete all existing players before upserting (use with -firestore)")
@@ -439,7 +445,7 @@ func writeMisses(misses []squadPlayer, def int) {
 		fmt.Println("No unmatched players — every squad player got a real rating.")
 		return
 	}
-	const path = "cmd/import/misses.txt"
+	const path = "tools/import/misses.txt"
 	var b strings.Builder
 	fmt.Fprintf(&b, "# %d players had no CSV rating match (assigned default %d)\n", len(misses), def)
 	fmt.Fprintf(&b, "# Team\tPOS\tName\tClub\n")
