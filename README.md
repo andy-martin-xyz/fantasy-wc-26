@@ -78,6 +78,9 @@ firebase deploy --only hosting,firestore:rules
 ```
 cmd/server/        Go API entry point
 cmd/seed/          Player seed script (local + production)
+tools/             One-time per-tournament bootstrap tools (not deployed):
+  import/          Builds the player pool from squad TSVs + ratings CSV
+  espn-ids/         Enriches tools/import/players.json with ESPN athlete ids
 internal/
   handlers/        HTTP route handlers
   middleware/       Auth + admin middleware

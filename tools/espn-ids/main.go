@@ -1,16 +1,19 @@
-// cmd/espn-ids resolves an ESPN athlete id for every player in the pool so that,
-// once the World Cup starts, live match stats are matched to drafted players by
-// id instead of by name. The name matching happens once, here — never per match.
+// tools/espn-ids resolves an ESPN athlete id for every player in the pool so
+// that, once the World Cup starts, live match stats are matched to drafted
+// players by id instead of by name. The name matching happens once, here —
+// never per match. Run after tools/import.
 //
-// It reads the pool (cmd/import/players.json), fetches each nation's ESPN roster,
-// matches within each nation, and writes players-with-espn.json + a misses
-// report. With -firestore it also writes espnAthleteId onto each player doc.
+// It reads the pool (tools/import/players.json), fetches each nation's ESPN
+// roster, matches within each nation, and enriches the same file in place
+// with espnAthleteId (plus a misses report) — one canonical player-pool file
+// instead of a separate output per enrichment step. With -firestore it also
+// writes espnAthleteId onto each player doc.
 //
 // Usage:
 //
-//	go run ./cmd/espn-ids                 # report coverage, write JSON (no DB writes)
-//	go run ./cmd/espn-ids -only Brazil    # probe one nation
-//	SEED_PRODUCTION=true go run ./cmd/espn-ids -firestore   # also write ids to prod
+//	go run ./tools/espn-ids                 # report coverage, write JSON (no DB writes)
+//	go run ./tools/espn-ids -only Brazil    # probe one nation
+//	SEED_PRODUCTION=true go run ./tools/espn-ids -firestore   # also write ids to prod
 package main
 
 import (
@@ -33,10 +36,10 @@ import (
 
 func main() {
 	var (
-		inPath       = flag.String("in", "cmd/import/players.json", "input player pool (import-endpoint shape)")
-		outPath      = flag.String("out", "cmd/espn-ids/players-with-espn.json", "output JSON, pool + espnAthleteId")
+		inPath       = flag.String("in", "tools/import/players.json", "input player pool (import-endpoint shape)")
+		outPath      = flag.String("out", "tools/import/players.json", "output JSON path — same file as -in by default, enriched in place")
 		only         = flag.String("only", "", "process a single nation only (exact app name, e.g. \"Brazil\")")
-		overridePath = flag.String("overrides", "cmd/espn-ids/espn-overrides.tsv", "manual Country\\tName\\tespnId overrides")
+		overridePath = flag.String("overrides", "tools/espn-ids/espn-overrides.tsv", "manual Country\\tName\\tespnId overrides")
 		toFirestore  = flag.Bool("firestore", false, "write espnAthleteId onto each matched player doc")
 	)
 	flag.Parse()
@@ -174,7 +177,7 @@ func writeMisses(misses []string) {
 		fmt.Println("No misses — every player resolved to an ESPN id.")
 		return
 	}
-	const path = "cmd/espn-ids/misses.txt"
+	const path = "tools/espn-ids/misses.txt"
 	body := "# country\tname\treason\n" + strings.Join(misses, "\n") + "\n"
 	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
 		fmt.Printf("warning: could not write misses: %v\n", err)
