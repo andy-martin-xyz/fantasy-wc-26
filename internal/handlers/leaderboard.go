@@ -5,6 +5,7 @@ import (
 	"sort"
 	"time"
 
+	"cloud.google.com/go/firestore"
 	"github.com/go-chi/chi/v5"
 	"github.com/andrewmartin/fantasy-league/internal/models"
 )
@@ -106,46 +107,93 @@ func (h *Handler) GetTeam(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load all matches into a map so we can look up opponent/date per stat row.
-	matchDocs, err := h.DB.FS.Collection("matches").Documents(r.Context()).GetAll()
-	if err != nil {
-		h.Log.Error("get team: list matches", "uid", uid, "err", err)
-		writeError(w, http.StatusInternalServerError, "internal error")
-		return
+	// One batched read for the roster's player docs (instead of one GetDoc
+	// per player).
+	playerRefs := make([]*firestore.DocumentRef, 0, len(roster.Players))
+	for _, rp := range roster.Players {
+		playerRefs = append(playerRefs, h.DB.FS.Collection("players").Doc(rp.PlayerID))
 	}
-	matchByID := make(map[string]models.Match, len(matchDocs))
-	for _, d := range matchDocs {
-		var m models.Match
-		if d.DataTo(&m) == nil {
-			matchByID[d.Ref.ID] = m
+	players := make(map[string]models.Player, len(playerRefs))
+	if len(playerRefs) > 0 {
+		snaps, err := h.DB.FS.GetAll(r.Context(), playerRefs)
+		if err != nil {
+			h.Log.Error("get team: batch get players", "uid", uid, "err", err)
+			writeError(w, http.StatusInternalServerError, "internal error")
+			return
+		}
+		for _, snap := range snaps {
+			if !snap.Exists() {
+				continue
+			}
+			var p models.Player
+			if snap.DataTo(&p) == nil {
+				players[snap.Ref.ID] = p
+			}
+		}
+	}
+
+	// One stats query for the whole roster (Firestore `in` allows up to 30
+	// values; rosters hold 11) instead of one query per player.
+	statsByPlayer := make(map[string][]models.PlayerMatchStats)
+	matchIDs := make(map[string]bool)
+	if len(roster.Players) > 0 {
+		ids := make([]string, 0, len(roster.Players))
+		for _, rp := range roster.Players {
+			ids = append(ids, rp.PlayerID)
+		}
+		statDocs, err := h.DB.FS.Collection("playerMatchStats").
+			Where("playerId", "in", ids).
+			Documents(r.Context()).GetAll()
+		if err != nil {
+			h.Log.Warn("get team: query stats", "uid", uid, "err", err)
+			statDocs = nil
+		}
+		for _, sd := range statDocs {
+			var ps models.PlayerMatchStats
+			if sd.DataTo(&ps) != nil {
+				continue
+			}
+			statsByPlayer[ps.PlayerID] = append(statsByPlayer[ps.PlayerID], ps)
+			matchIDs[ps.MatchID] = true
+		}
+	}
+
+	// Batch-read only the matches referenced by those stats (for opponent and
+	// date), instead of scanning the whole matches collection.
+	matchByID := make(map[string]models.Match, len(matchIDs))
+	if len(matchIDs) > 0 {
+		refs := make([]*firestore.DocumentRef, 0, len(matchIDs))
+		for id := range matchIDs {
+			refs = append(refs, h.DB.FS.Collection("matches").Doc(id))
+		}
+		snaps, err := h.DB.FS.GetAll(r.Context(), refs)
+		if err != nil {
+			h.Log.Warn("get team: batch get matches", "uid", uid, "err", err)
+			snaps = nil
+		}
+		for _, snap := range snaps {
+			if !snap.Exists() {
+				continue
+			}
+			var m models.Match
+			if snap.DataTo(&m) == nil {
+				matchByID[snap.Ref.ID] = m
+			}
 		}
 	}
 
 	// Enrich each roster player with totalPoints and per-match breakdown.
 	enriched := make([]playerWithPoints, 0, len(roster.Players))
 	for _, rp := range roster.Players {
-		var p models.Player
-		found, err := h.DB.GetDoc(r.Context(), "players", rp.PlayerID, &p)
-		if err != nil || !found {
+		p, found := players[rp.PlayerID]
+		if !found {
 			enriched = append(enriched, playerWithPoints{RosterPlayer: rp, MatchStats: []matchStatRow{}})
 			continue
 		}
 
-		// Query all playerMatchStats for this player.
-		statDocs, err := h.DB.FS.Collection("playerMatchStats").
-			Where("playerId", "==", rp.PlayerID).
-			Documents(r.Context()).GetAll()
-		if err != nil {
-			h.Log.Warn("get team: query stats", "playerId", rp.PlayerID, "err", err)
-			statDocs = nil
-		}
-
-		rows := make([]matchStatRow, 0, len(statDocs))
-		for _, sd := range statDocs {
-			var ps models.PlayerMatchStats
-			if sd.DataTo(&ps) != nil {
-				continue
-			}
+		stats := statsByPlayer[rp.PlayerID]
+		rows := make([]matchStatRow, 0, len(stats))
+		for _, ps := range stats {
 			row := matchStatRow{
 				MatchID:       ps.MatchID,
 				Goals:         ps.Goals,
