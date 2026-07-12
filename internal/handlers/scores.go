@@ -93,12 +93,30 @@ func (h *Handler) ProcessScores(w http.ResponseWriter, r *http.Request) {
 // re-running for the same match overwrites previous stats. Shared by manual
 // score entry (ProcessScores) and ESPN auto-fetch (FetchScores).
 func (h *Handler) applyMatchStats(ctx context.Context, matchID string, stats []statSubmission) error {
-	// 1. Write playerMatchStats for each submitted player (overwrites previous).
+	if err := h.writeStats(ctx, matchID, stats); err != nil {
+		return err
+	}
+	if err := h.recalculateTotals(ctx); err != nil {
+		return err
+	}
+	// Mark match as scored.
+	_ = h.DB.UpdateDoc(ctx, "matches", matchID, []firestore.Update{
+		{Path: "scoringProcessed", Value: true},
+		{Path: "status", Value: "complete"},
+	})
+	return nil
+}
+
+// writeStats writes one playerMatchStats doc per submission, computing points
+// from the player's position. Overwrites previous stats for the same
+// player+match, so every scoring path can re-run idempotently. Callers are
+// responsible for recalculating totals afterwards (recalculateTotals).
+func (h *Handler) writeStats(ctx context.Context, matchID string, stats []statSubmission) error {
 	for _, s := range stats {
 		var player models.Player
 		pfound, err := h.DB.GetDoc(ctx, "players", s.PlayerID, &player)
 		if err != nil || !pfound {
-			h.Log.Warn("apply stats: player not found, skipping", "playerId", s.PlayerID)
+			h.Log.Warn("write stats: player not found, skipping", "playerId", s.PlayerID)
 			continue
 		}
 
@@ -120,24 +138,22 @@ func (h *Handler) applyMatchStats(ctx context.Context, matchID string, stats []s
 			return fmt.Errorf("write stats %s: %w", docID, err)
 		}
 	}
+	return nil
+}
 
-	// 2. Recalculate totalPoints for every drafted player (idempotent).
+// recalculateTotals rebuilds player totals, roster totals, and the
+// leaderboard from playerMatchStats — the one derived-state pipeline every
+// scoring path (manual, admin fetch, cron) runs after writing stats.
+func (h *Handler) recalculateTotals(ctx context.Context) error {
 	if err := h.recalculateAllPlayerPoints(ctx); err != nil {
 		return fmt.Errorf("recalculate player points: %w", err)
 	}
-	// 3. Recalculate each roster's totalPoints.
 	if err := h.recalculateAllRosterPoints(ctx); err != nil {
 		return fmt.Errorf("recalculate roster points: %w", err)
 	}
-	// 4. Rebuild leaderboard/current.
 	if err := h.rebuildLeaderboard(ctx); err != nil {
 		return fmt.Errorf("rebuild leaderboard: %w", err)
 	}
-	// 5. Mark match as scored.
-	_ = h.DB.UpdateDoc(ctx, "matches", matchID, []firestore.Update{
-		{Path: "scoringProcessed", Value: true},
-		{Path: "status", Value: "complete"},
-	})
 	return nil
 }
 
