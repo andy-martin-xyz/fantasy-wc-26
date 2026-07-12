@@ -11,29 +11,11 @@
   <script defer src="js/app.js"></script>
   <script defer src="js/auth.js"></script>
   <script defer src="js/api.js"></script>
+  <script defer src="js/nav.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.9/dist/cdn.min.js"></script>
 </head>
 <body x-data="{ navOpen: false }" @keydown.escape.window="navOpen = false">
   <div class="app-wrapper">
-
-    <!-- Nav -->
-    <nav class="nav">
-      <a href="index.html" class="nav-brand">
-        <span class="brand-icon">⚽</span>
-        <span class="brand-text">WC <span>Fantasy</span></span>
-      </a>
-      <div style="display:flex;align-items:center;gap:8px">
-        <button class="nav-hamburger" @click="navOpen = !navOpen" aria-label="Menu">
-          <span x-text="navOpen ? '✕' : '☰'"></span>
-        </button>
-      </div>
-    </nav>
-    <div x-show="navOpen" x-cloak @click="navOpen = false"
-         style="position:fixed;inset:0;z-index:150"></div>
-    <div class="nav-drawer" x-show="navOpen" x-cloak>
-      <a href="index.html" class="nav-drawer-link">Standings</a>
-      <a href="login.html" class="nav-drawer-link active">Sign In</a>
-    </div>
 
     <!-- Login card -->
     <main class="page-content"
