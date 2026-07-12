@@ -11,6 +11,34 @@ import (
 	"github.com/andrewmartin/fantasy-league/internal/models"
 )
 
+// TestMatchOutcome guards the halftime-points bug: outcome flags (win/draw,
+// clean sheets) must all be false until the match is final, no matter the
+// current score, so live ticks award only event stats.
+func TestMatchOutcome(t *testing.T) {
+	tests := []struct {
+		name       string
+		state      string
+		home, away int
+		want       outcome
+	}{
+		{"live 1-0 is not a win yet", "in", 1, 0, outcome{}},
+		{"live 1-1 is not a draw yet", "in", 1, 1, outcome{}},
+		{"live 0-0 is not clean sheets yet", "in", 0, 0, outcome{}},
+		{"pre-match nothing", "pre", 0, 0, outcome{}},
+		{"final home win + clean sheet", "post", 2, 0, outcome{homeWin: true, homeCleanSheet: true}},
+		{"final away win + clean sheet", "post", 0, 1, outcome{awayWin: true, awayCleanSheet: true}},
+		{"final score draw", "post", 2, 2, outcome{draw: true}},
+		{"final goalless draw, both clean sheets", "post", 0, 0, outcome{draw: true, homeCleanSheet: true, awayCleanSheet: true}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := matchOutcome(tt.state, tt.home, tt.away); got != tt.want {
+				t.Errorf("matchOutcome(%q, %d, %d) = %+v, want %+v", tt.state, tt.home, tt.away, got, tt.want)
+			}
+		})
+	}
+}
+
 // TestProcessScores exercises the whole manual-entry scoring pipeline against
 // the emulator: writeStats → recalculateTotals → match marked complete. This
 // is the same shared pipeline the ESPN fetch and cron paths call, so it
