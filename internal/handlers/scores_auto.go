@@ -156,11 +156,14 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Win/draw based on the current score so live win-bonus feedback kicks
-		// in immediately. The final "post" write locks in the correct value.
-		draw := sum.Home.Score == sum.Away.Score
-		homeWin := sum.Home.Score > sum.Away.Score
-		awayWin := sum.Away.Score > sum.Home.Score
+		// Outcome points (win/draw bonuses, clean sheets) only exist once the
+		// match is final — a halftime lead isn't a win, and no goals conceded
+		// by the break isn't a clean sheet. Live ticks award event stats only
+		// (goals, assists, cards); the final "post" write adds the outcomes.
+		final := sum.State == "post"
+		draw := final && sum.Home.Score == sum.Away.Score
+		homeWin := final && sum.Home.Score > sum.Away.Score
+		awayWin := final && sum.Away.Score > sum.Home.Score
 
 		var subs []statSubmission
 		processSide := func(side espn.TeamSide, country string, win, cleanSheet bool) {
@@ -190,8 +193,8 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 				})
 			}
 		}
-		processSide(sum.Home, m.HomeTeam, homeWin, sum.Away.Score == 0)
-		processSide(sum.Away, m.AwayTeam, awayWin, sum.Home.Score == 0)
+		processSide(sum.Home, m.HomeTeam, homeWin, final && sum.Away.Score == 0)
+		processSide(sum.Away, m.AwayTeam, awayWin, final && sum.Home.Score == 0)
 
 		if err := h.writeMatchStatsOnly(ctx, m.ID, subs); err != nil {
 			res.Status = "write_error"
