@@ -58,66 +58,21 @@ func (h *Handler) FetchScores(w http.ResponseWriter, r *http.Request) {
 	var preview []previewStat
 	var unmatched []map[string]any
 
-	processSide := func(side espn.TeamSide, country string, win, cleanSheet bool) error {
-		cands, byESPN, err := h.loadCountryPlayers(ctx, country)
-		if err != nil {
-			return err
-		}
-		for _, a := range side.Athletes {
-			if !a.Played {
-				continue
-			}
-			// Exact ESPN-id match first (resolved once by cmd/espn-ids); fall
-			// back to nation-scoped name matching only when no id is stored.
-			pid, pos := "", ""
-			if c, ok := byESPN[a.ESPNID]; ok && a.ESPNID != "" {
-				pid, pos = c.ID, c.Position
-			} else {
-				pid, pos = matchAthlete(a.Name, cands)
-			}
-			if pid == "" {
-				// Only flag unmatched athletes that actually earned/lost points —
-				// a bench-warmer with no events isn't worth admin attention.
-				if a.Goals > 0 || a.Assists > 0 || a.Yellow > 0 || a.Red > 0 {
-					unmatched = append(unmatched, map[string]any{
-						"name": a.Name, "team": country,
-						"goals": a.Goals, "assists": a.Assists,
-						"yellowCards": a.Yellow, "redCards": a.Red,
-					})
-				}
-				continue
-			}
-			cs := cleanSheet && (pos == "GK" || pos == "DEF")
-			ss := statSubmission{
-				PlayerID: pid, Goals: a.Goals, Assists: a.Assists,
-				YellowCards: a.Yellow, RedCards: a.Red,
-				CleanSheet: cs, TeamWin: win, TeamDraw: draw,
-			}
-			subs = append(subs, ss)
-			pts := models.CalculatePoints(models.PlayerMatchStats{
-				Goals: ss.Goals, Assists: ss.Assists, CleanSheet: ss.CleanSheet,
-				YellowCards: ss.YellowCards, RedCards: ss.RedCards,
-				TeamWin: ss.TeamWin, TeamDraw: ss.TeamDraw,
-			}, pos)
-			preview = append(preview, previewStat{
-				PlayerID: pid, Name: a.Name, Team: country, Position: pos,
-				Goals: ss.Goals, Assists: ss.Assists, Yellow: ss.YellowCards, Red: ss.RedCards,
-				CleanSheet: ss.CleanSheet, TeamWin: ss.TeamWin, TeamDraw: ss.TeamDraw, Points: pts,
-			})
-		}
-		return nil
-	}
-
-	if err := processSide(sum.Home, match.HomeTeam, homeWin, sum.Away.Score == 0); err != nil {
+	homeSubs, homePreview, homeUnmatched, err := h.mapSideToStats(ctx, sum.Home, match.HomeTeam, homeWin, draw, sum.Away.Score == 0)
+	if err != nil {
 		h.Log.Error("fetch scores: home side", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error mapping players")
 		return
 	}
-	if err := processSide(sum.Away, match.AwayTeam, awayWin, sum.Home.Score == 0); err != nil {
+	awaySubs, awayPreview, awayUnmatched, err := h.mapSideToStats(ctx, sum.Away, match.AwayTeam, awayWin, draw, sum.Home.Score == 0)
+	if err != nil {
 		h.Log.Error("fetch scores: away side", "err", err)
 		writeError(w, http.StatusInternalServerError, "internal error mapping players")
 		return
 	}
+	subs = append(append(subs, homeSubs...), awaySubs...)
+	preview = append(append(preview, homePreview...), awayPreview...)
+	unmatched = append(append(unmatched, homeUnmatched...), awayUnmatched...)
 
 	committed := false
 	if r.URL.Query().Get("commit") == "true" {
@@ -164,6 +119,65 @@ type previewStat struct {
 	TeamWin    bool   `json:"teamWin"`
 	TeamDraw   bool   `json:"teamDraw"`
 	Points     int    `json:"points"`
+}
+
+// mapSideToStats maps one ESPN side's played athletes onto the player pool,
+// returning stat submissions, preview rows (admin display), and any unmatched
+// athletes that recorded events. It is the single athlete→stats path shared
+// by admin fetch (FetchScores) and the cron poller (AutoScore), so scoring
+// rules can't drift between them.
+func (h *Handler) mapSideToStats(ctx context.Context, side espn.TeamSide, country string, win, draw, cleanSheet bool) ([]statSubmission, []previewStat, []map[string]any, error) {
+	cands, byESPN, err := h.loadCountryPlayers(ctx, country)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+
+	var subs []statSubmission
+	var preview []previewStat
+	var unmatched []map[string]any
+	for _, a := range side.Athletes {
+		if !a.Played {
+			continue
+		}
+		// Exact ESPN-id match first (ids resolved once, pre-tournament); fall
+		// back to nation-scoped name matching only when no id is stored.
+		pid, pos := "", ""
+		if c, ok := byESPN[a.ESPNID]; ok && a.ESPNID != "" {
+			pid, pos = c.ID, c.Position
+		} else {
+			pid, pos = matchAthlete(a.Name, cands)
+		}
+		if pid == "" {
+			// Only flag unmatched athletes that actually earned/lost points —
+			// a bench-warmer with no events isn't worth admin attention.
+			if a.Goals > 0 || a.Assists > 0 || a.Yellow > 0 || a.Red > 0 {
+				unmatched = append(unmatched, map[string]any{
+					"name": a.Name, "team": country,
+					"goals": a.Goals, "assists": a.Assists,
+					"yellowCards": a.Yellow, "redCards": a.Red,
+				})
+			}
+			continue
+		}
+		cs := cleanSheet && (pos == "GK" || pos == "DEF")
+		ss := statSubmission{
+			PlayerID: pid, Goals: a.Goals, Assists: a.Assists,
+			YellowCards: a.Yellow, RedCards: a.Red,
+			CleanSheet: cs, TeamWin: win, TeamDraw: draw,
+		}
+		subs = append(subs, ss)
+		pts := models.CalculatePoints(models.PlayerMatchStats{
+			Goals: ss.Goals, Assists: ss.Assists, CleanSheet: ss.CleanSheet,
+			YellowCards: ss.YellowCards, RedCards: ss.RedCards,
+			TeamWin: ss.TeamWin, TeamDraw: ss.TeamDraw,
+		}, pos)
+		preview = append(preview, previewStat{
+			PlayerID: pid, Name: a.Name, Team: country, Position: pos,
+			Goals: ss.Goals, Assists: ss.Assists, Yellow: ss.YellowCards, Red: ss.RedCards,
+			CleanSheet: ss.CleanSheet, TeamWin: ss.TeamWin, TeamDraw: ss.TeamDraw, Points: pts,
+		})
+	}
+	return subs, preview, unmatched, nil
 }
 
 // playerCand is a drafted-pool player we can match an ESPN athlete against.

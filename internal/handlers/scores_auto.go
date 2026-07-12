@@ -162,38 +162,28 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 		homeWin := sum.Home.Score > sum.Away.Score
 		awayWin := sum.Away.Score > sum.Home.Score
 
+		// Same athlete→stats mapping as the admin fetch path; the cron ignores
+		// preview rows and unmatched athletes (nobody is watching to fix them
+		// mid-tick — the admin fetch endpoint surfaces those for review).
 		var subs []statSubmission
-		processSide := func(side espn.TeamSide, country string, win, cleanSheet bool) {
-			cands, byESPN, err := h.loadCountryPlayers(ctx, country)
+		for _, s := range []struct {
+			side       espn.TeamSide
+			country    string
+			win        bool
+			cleanSheet bool
+		}{
+			{sum.Home, m.HomeTeam, homeWin, sum.Away.Score == 0},
+			{sum.Away, m.AwayTeam, awayWin, sum.Home.Score == 0},
+		} {
+			ss, _, _, err := h.mapSideToStats(ctx, s.side, s.country, s.win, draw, s.cleanSheet)
 			if err != nil {
-				h.Log.Warn("auto-score: load players", "country", country, "err", err)
-				return
+				h.Log.Warn("auto-score: load players", "country", s.country, "err", err)
+				continue
 			}
-			for _, a := range side.Athletes {
-				if !a.Played {
-					continue
-				}
-				pid, pos := "", ""
-				if c, ok := byESPN[a.ESPNID]; ok && a.ESPNID != "" {
-					pid, pos = c.ID, c.Position
-				} else {
-					pid, pos = matchAthlete(a.Name, cands)
-				}
-				if pid == "" {
-					continue
-				}
-				cs := cleanSheet && (pos == "GK" || pos == "DEF")
-				subs = append(subs, statSubmission{
-					PlayerID: pid, Goals: a.Goals, Assists: a.Assists,
-					YellowCards: a.Yellow, RedCards: a.Red,
-					CleanSheet: cs, TeamWin: win, TeamDraw: draw,
-				})
-			}
+			subs = append(subs, ss...)
 		}
-		processSide(sum.Home, m.HomeTeam, homeWin, sum.Away.Score == 0)
-		processSide(sum.Away, m.AwayTeam, awayWin, sum.Home.Score == 0)
 
-		if err := h.writeMatchStatsOnly(ctx, m.ID, subs); err != nil {
+		if err := h.writeStats(ctx, m.ID, subs); err != nil {
 			res.Status = "write_error"
 			res.Err = err.Error()
 			h.Log.Error("auto-score: write stats", "matchId", m.ID, "err", err)
@@ -228,14 +218,8 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 	// rather than once per match, so leaderboard writes don't multiply with
 	// concurrent live matches.
 	if scored > 0 {
-		if err := h.recalculateAllPlayerPoints(ctx); err != nil {
-			h.Log.Error("auto-score: recalculate players", "err", err)
-		}
-		if err := h.recalculateAllRosterPoints(ctx); err != nil {
-			h.Log.Error("auto-score: recalculate rosters", "err", err)
-		}
-		if err := h.rebuildLeaderboard(ctx); err != nil {
-			h.Log.Error("auto-score: rebuild leaderboard", "err", err)
+		if err := h.recalculateTotals(ctx); err != nil {
+			h.Log.Error("auto-score: recalculate totals", "err", err)
 		}
 	}
 
@@ -250,80 +234,15 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 }
 
 // syncMissingFixtures fetches the full WC fixture list from ESPN and creates
-// match docs for any events not yet in Firestore. Skips placeholder team names
-// (e.g. "Round of 32 Winner") that appear before brackets are set, and never
-// overwrites a match that's already been scored. Returns the number of new docs
-// created.
+// match docs for any events not yet in Firestore (updateExisting=false: known
+// fixtures — including already-scored ones — are never touched). Placeholder
+// team names ("Round of 32 Winner") are skipped until brackets resolve.
+// Returns the number of new docs created.
 func (h *Handler) syncMissingFixtures(ctx context.Context) (int, error) {
-	fixtures, err := espn.FetchFixtures(ctx, "20260611-20260719")
+	fixtures, err := espn.FetchFixtures(ctx, wcTournamentDates)
 	if err != nil {
 		return 0, fmt.Errorf("fetch fixtures: %w", err)
 	}
-
-	// Build a set of match IDs already in Firestore.
-	existing, err := h.DB.FS.Collection("matches").Documents(ctx).GetAll()
-	if err != nil {
-		return 0, fmt.Errorf("list matches: %w", err)
-	}
-	inDB := make(map[string]bool, len(existing))
-	for _, d := range existing {
-		inDB[d.Ref.ID] = true
-	}
-
-	imported := 0
-	for _, f := range fixtures {
-		if inDB[f.EventID] {
-			continue // already have this match
-		}
-		home := models.NormalizeTeamName(f.HomeTeam)
-		away := models.NormalizeTeamName(f.AwayTeam)
-		if home == "" || away == "" {
-			continue // placeholder — real teams not yet decided
-		}
-		match := models.Match{
-			ID:          f.EventID,
-			HomeTeam:    home,
-			AwayTeam:    away,
-			Date:        f.Date,
-			Status:      statusFromState(f.State),
-			ESPNEventID: f.EventID,
-		}
-		if err := h.DB.SetDoc(ctx, "matches", f.EventID, match); err != nil {
-			h.Log.Warn("sync fixtures: write failed", "id", f.EventID, "err", err)
-			continue
-		}
-		imported++
-		h.Log.Info("sync fixtures: imported", "id", f.EventID, "home", home, "away", away, "date", f.Date.Format("Jan 02"))
-	}
-	return imported, nil
-}
-
-// writeMatchStatsOnly writes playerMatchStats docs for one match.
-// Callers are responsible for calling the recalculate helpers afterwards.
-func (h *Handler) writeMatchStatsOnly(ctx context.Context, matchID string, stats []statSubmission) error {
-	for _, s := range stats {
-		var player models.Player
-		pfound, err := h.DB.GetDoc(ctx, "players", s.PlayerID, &player)
-		if err != nil || !pfound {
-			h.Log.Warn("write match stats: player not found, skipping", "playerId", s.PlayerID)
-			continue
-		}
-		ps := models.PlayerMatchStats{
-			PlayerID:    s.PlayerID,
-			MatchID:     matchID,
-			Goals:       s.Goals,
-			Assists:     s.Assists,
-			CleanSheet:  s.CleanSheet,
-			YellowCards: s.YellowCards,
-			RedCards:    s.RedCards,
-			TeamWin:     s.TeamWin,
-			TeamDraw:    s.TeamDraw,
-		}
-		ps.PointsAwarded = models.CalculatePoints(ps, player.Position)
-		docID := s.PlayerID + "_" + matchID
-		if err := h.DB.SetDoc(ctx, "playerMatchStats", docID, ps); err != nil {
-			return fmt.Errorf("write stats %s: %w", docID, err)
-		}
-	}
-	return nil
+	res := h.upsertFixtures(ctx, fixtures, false)
+	return res.Imported, nil
 }
