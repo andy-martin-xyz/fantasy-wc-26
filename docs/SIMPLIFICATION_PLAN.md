@@ -134,6 +134,20 @@ by its own name.
 delete `sofifa-test` + `fixtures` + `import` now and keep the two ID-resolver
 tools until the group stage ends.
 
+**Revised outcome:** `sofifa-test` (scratch experiment) and `fixtures`
+(genuinely redundant — its own header comment says "Mirrors the
+`POST /api/admin/fixtures/import` handler") were deleted as planned.
+`apifootball-ids` was also dropped, but for a different reason discovered
+while doing this: its output file had 0/1244 players with an
+`apiFootballId` ever resolved, and the model doesn't even have a field for
+it — that pipeline never worked and nothing reads its output. `import` and
+`espn-ids` were kept (real per-tournament bootstrap work, not reproducible
+from an endpoint), moved to `tools/` to separate them from `cmd/`'s
+deployed-service packages, and their three player-list JSON files
+(`players.json`, `players-with-ids.json` — the dead one, `players-with-espn.json`)
+consolidated into one `tools/import/players.json` that `espn-ids` now
+enriches in place instead of writing a separate output file.
+
 **Payoff:** ~22% of the Go codebase gone; `go build ./...`, CI, and every
 future grep get faster and quieter.
 
