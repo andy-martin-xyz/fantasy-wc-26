@@ -156,11 +156,7 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// Win/draw based on the current score so live win-bonus feedback kicks
-		// in immediately. The final "post" write locks in the correct value.
-		draw := sum.Home.Score == sum.Away.Score
-		homeWin := sum.Home.Score > sum.Away.Score
-		awayWin := sum.Away.Score > sum.Home.Score
+		out := matchOutcome(sum.State, sum.Home.Score, sum.Away.Score)
 
 		// Same athlete→stats mapping as the admin fetch path; the cron ignores
 		// preview rows and unmatched athletes (nobody is watching to fix them
@@ -172,10 +168,10 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 			win        bool
 			cleanSheet bool
 		}{
-			{sum.Home, m.HomeTeam, homeWin, sum.Away.Score == 0},
-			{sum.Away, m.AwayTeam, awayWin, sum.Home.Score == 0},
+			{sum.Home, m.HomeTeam, out.homeWin, out.homeCleanSheet},
+			{sum.Away, m.AwayTeam, out.awayWin, out.awayCleanSheet},
 		} {
-			ss, _, _, err := h.mapSideToStats(ctx, s.side, s.country, s.win, draw, s.cleanSheet)
+			ss, _, _, err := h.mapSideToStats(ctx, s.side, s.country, s.win, out.draw, s.cleanSheet)
 			if err != nil {
 				h.Log.Warn("auto-score: load players", "country", s.country, "err", err)
 				continue
@@ -231,6 +227,31 @@ func (h *Handler) AutoScore(w http.ResponseWriter, r *http.Request) {
 		"scored":            scored,
 		"results":           results,
 	})
+}
+
+// outcome holds the outcome-based scoring flags for one match state.
+type outcome struct {
+	homeWin, awayWin, draw         bool
+	homeCleanSheet, awayCleanSheet bool
+}
+
+// matchOutcome derives win/draw/clean-sheet flags from an ESPN match state.
+// Outcome points only exist once the match is final ("post") — a halftime
+// lead isn't a win, and no goals conceded by the break isn't a clean sheet.
+// For live ("in") matches every flag is false, so ticks award only event
+// stats that have actually happened (goals, assists, cards); the final write
+// adds the outcomes.
+func matchOutcome(state string, homeScore, awayScore int) outcome {
+	if state != "post" {
+		return outcome{}
+	}
+	return outcome{
+		homeWin:        homeScore > awayScore,
+		awayWin:        awayScore > homeScore,
+		draw:           homeScore == awayScore,
+		homeCleanSheet: awayScore == 0,
+		awayCleanSheet: homeScore == 0,
+	}
 }
 
 // syncMissingFixtures fetches the full WC fixture list from ESPN and creates
