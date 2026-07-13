@@ -13,19 +13,26 @@ A real-time fantasy soccer draft app for World Cup 2026, built for a small frien
 
 - Live snake draft room with real-time pick updates via Firestore `onSnapshot`
 - Countdown timer per pick, turn banner, draft history
-- AI pick suggestions powered by Claude (Anthropic API)
 - Admin panel — start/pause/resume draft, import players, process match scores
 - Leaderboard and team roster views
 
 ## Local Development
+
+**Important:** only Firestore is emulated. Auth is not — sign-in always hits
+your real Firebase project (Google Sign-In), even locally, so the backend
+needs a real service account key regardless of which path below you use.
+
+1. In Firebase Console → Project Settings → Service Accounts → Generate new
+   private key. Save the download as `keys/service-account.json`
+   (gitignored — never commit it).
+2. `cp .env.example .env` and fill in your Firebase values, including
+   `GOOGLE_APPLICATION_CREDENTIALS` (defaults to the path from step 1).
 
 ### Docker (recommended)
 
 Requires: Docker Desktop
 
 ```bash
-cp .env.example .env
-# Fill in your Firebase values (Firebase Console → Project Settings → Your Apps)
 docker compose up
 ```
 
@@ -41,10 +48,11 @@ cp public/js/config.js.example public/js/config.js
 ```
 
 ```bash
-# Terminal 1 — Firebase emulators (Auth + Firestore)
+# Terminal 1 — Firestore emulator (firebase.json also starts an Auth
+# emulator, but nothing in this app actually talks to it — ignore it)
 firebase emulators:start
 
-# Terminal 2 — Go API server
+# Terminal 2 — Go API server (reads .env from step 2 above)
 ./scripts/dev.sh
 
 # Terminal 3 — Static file server
@@ -62,6 +70,23 @@ docker compose exec api go run ./cmd/seed
 # Manual
 ./scripts/seed.sh
 ```
+
+## Testing
+
+Requires: Firebase CLI, Java (for the Firestore emulator) — same as manual local dev.
+
+```bash
+# Terminal 1 — start the emulator
+firebase emulators:start --only firestore
+
+# Terminal 2 — run the suite against it
+FIRESTORE_EMULATOR_HOST=localhost:8080 go test ./...
+```
+
+Tests that touch Firestore (draft, scoring, team handlers) skip cleanly if
+`FIRESTORE_EMULATOR_HOST` isn't set, so plain `go test ./...` never fails on a
+machine without the emulator running — it just gets less coverage. CI
+(`.github/workflows/ci.yml`) runs the full emulator-backed suite on every PR.
 
 ## Deployment
 

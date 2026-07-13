@@ -1,8 +1,11 @@
 #!/bin/sh
 # Seed the Firestore emulator with test players.
-# Requires: firebase emulators:start already running.
+# Requires: firebase emulators:start already running, and a filled-in .env.
 
-export FIREBASE_PROJECT_ID=andy-personal-1bb38
-export FIRESTORE_EMULATOR_HOST=127.0.0.1:8080
+set -a
+[ -f .env ] && . ./.env
+set +a
+
+export FIRESTORE_EMULATOR_HOST="${FIRESTORE_EMULATOR_HOST:-127.0.0.1:8080}"
 
 exec go run ./cmd/seed

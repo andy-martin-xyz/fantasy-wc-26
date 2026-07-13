@@ -22,10 +22,10 @@ services:
       - FIREBASE_PROJECT_ID=${FIREBASE_PROJECT_ID}
       - FIRESTORE_EMULATOR_HOST=emulators:8080
       - ADMIN_EMAILS=${ADMIN_EMAILS}
-      - GOOGLE_APPLICATION_CREDENTIALS=/keys/fantasy-wc-sa.json
+      - GOOGLE_APPLICATION_CREDENTIALS=/keys/service-account.json
     volumes:
       - .:/app
-      - /Users/andrewmartin/keys:/keys:ro
+      - ./keys:/keys:ro
     working_dir: /app
     command: go run ./cmd/server
     depends_on:
